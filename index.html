@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartTUT — Biceps Curl Tracker</title>
+  <meta name="description" content="Smart wristband dashboard for real-time biceps curl tracking with BLE.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07070d;
+      --surface: #0f0f1a;
+      --surface2: #171726;
+      --surface3: #1e1e30;
+      --border: #252538;
+      --accent: #6c63ff;
+      --accent2: #ff6384;
+      --accent3: #36d399;
+      --accent4: #f59e0b;
+      --text: #eaeaf5;
+      --text-muted: #5a5a7a;
+      --text-dim: #3a3a55;
+      --concentric: #36d399;
+      --eccentric: #f59e0b;
+      --top-pause: #6c63ff;
+      --bottom-pause: #ff6384;
+      --mid-hold: #64748b;
+      --radius: 14px;
+    }
+
+    html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); overflow-x: hidden; }
+
+    /* ── SCREENS ─────────────────────────────── */
+    .screen { display: none; min-height: calc(100vh - 64px); padding: 32px; animation: fadeIn .3s ease; }
+    .screen.active { display: block; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+
+    /* ── HEADER ─────────────────────────────── */
+    header {
+      position: sticky; top: 0; z-index: 200;
+      height: 64px; display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px; background: rgba(7,7,13,.92); backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    .logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .logo-title { font-size: 18px; font-weight: 700; letter-spacing: -.5px; color: var(--text); }
+    .logo-sub { font-size: 11px; color: var(--text-muted); }
+
+    .header-right { display: flex; gap: 10px; align-items: center; }
+
+    .session-badge {
+      display: none; align-items: center; gap: 8px;
+      padding: 6px 14px; border-radius: 20px;
+      background: rgba(54,211,153,.12); border: 1px solid rgba(54,211,153,.25);
+      font-size: 12px; font-weight: 600; color: var(--accent3);
+    }
+    .session-badge.show { display: flex; }
+    .session-badge .live-dot { width:7px;height:7px;border-radius:50%;background:var(--accent3);animation:blink 1s infinite; }
+    @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+
+    #connectBtn {
+      display: flex; align-items: center; gap: 8px; padding: 10px 20px;
+      border: none; border-radius: 10px; cursor: pointer;
+      font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+      background: linear-gradient(135deg,var(--accent),#8b5cf6); color: #fff;
+      transition: all .2s; box-shadow: 0 4px 15px rgba(108,99,255,.3);
+    }
+    #connectBtn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(108,99,255,.45); }
+    #connectBtn.connected  { background: linear-gradient(135deg,var(--accent3),#059669); box-shadow: 0 4px 15px rgba(54,211,153,.3); }
+    #connectBtn.connecting { background: linear-gradient(135deg,#f59e0b,#d97706); }
+    .ble-dot { width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.5); }
+    .ble-dot.pulse { animation: blink 1s infinite; }
+
+    /* ── BUTTONS ─────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 28px; border-radius: 12px; border: none; cursor: pointer;
+      font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600;
+      transition: all .2s;
+    }
+    .btn-primary { background: linear-gradient(135deg,var(--accent),#8b5cf6); color:#fff; box-shadow:0 4px 15px rgba(108,99,255,.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(108,99,255,.4); }
+    .btn-secondary { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface3); color: var(--text); }
+    .btn-danger { background: rgba(255,99,132,.15); color: var(--accent2); border: 1px solid rgba(255,99,132,.3); }
+    .btn-danger:hover { background: rgba(255,99,132,.25); }
+    .btn-success { background: rgba(54,211,153,.15); color: var(--accent3); border: 1px solid rgba(54,211,153,.3); }
+    .btn-success:hover { background: rgba(54,211,153,.25); }
+    .btn-sm { padding: 9px 18px; font-size: 13px; border-radius: 9px; }
+    .btn-full { width: 100%; }
+
+    /* ── CARDS ─────────────────────────────── */
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 20px 24px;
+    }
+    .card-title {
+      font-size: 11px; font-weight: 600; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .8px; margin-bottom: 14px;
+    }
+
+    /* ── FORM ─────────────────────────────── */
+    .form-group { margin-bottom: 18px; }
+    .form-label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+    .form-input {
+      width: 100%; padding: 12px 16px; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 10px; color: var(--text);
+      font-family: 'Inter',sans-serif; font-size: 15px; outline: none;
+      transition: border-color .2s;
+    }
+    .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(108,99,255,.15); }
+    .form-input::placeholder { color: var(--text-dim); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* Unit toggle */
+    .unit-toggle { display: flex; gap: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    .unit-btn {
+      flex: 1; padding: 12px; background: var(--surface2); border: none; cursor: pointer;
+      font-family: 'Inter',sans-serif; font-size: 13px; font-weight: 600; color: var(--text-muted);
+      transition: all .15s;
+    }
+    .unit-btn.active { background: var(--accent); color: #fff; }
+
+    /* ══════════════════════════════════════════
+       SCREEN: CONNECT
+    ══════════════════════════════════════════ */
+    #screen-connect {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: calc(100vh - 64px); text-align: center;
+    }
+    .connect-hero { margin-bottom: 40px; }
+    .connect-icon {
+      width: 100px; height: 100px; border-radius: 28px; margin: 0 auto 24px;
+      background: linear-gradient(135deg,var(--accent),var(--accent2));
+      display: flex; align-items: center; justify-content: center; font-size: 48px;
+      box-shadow: 0 20px 60px rgba(108,99,255,.4);
+    }
+    .connect-title { font-size: 36px; font-weight: 900; letter-spacing: -1.5px; margin-bottom: 12px; }
+    .connect-sub { font-size: 16px; color: var(--text-muted); max-width: 400px; line-height: 1.6; }
+    .connect-steps {
+      display: flex; gap: 20px; margin-bottom: 40px; flex-wrap: wrap; justify-content: center;
+    }
+    .step-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      padding: 16px 20px; width: 160px; text-align: left;
+    }
+    .step-num { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+    .step-text { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+
+    /* ══════════════════════════════════════════
+       SCREEN: MODE SELECT
+    ══════════════════════════════════════════ */
+    #screen-mode { display: none; max-width: 800px; margin: 0 auto; }
+    .mode-title { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; text-align: center; }
+    .mode-sub { font-size: 14px; color: var(--text-muted); text-align: center; margin-bottom: 40px; }
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .mode-card {
+      background: var(--surface); border: 2px solid var(--border); border-radius: 18px;
+      padding: 36px 32px; cursor: pointer; transition: all .25s; text-align: left;
+    }
+    .mode-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 20px 40px rgba(108,99,255,.2); }
+    .mode-card.precision:hover { border-color: var(--accent3); box-shadow: 0 20px 40px rgba(54,211,153,.2); }
+    .mode-icon { font-size: 40px; margin-bottom: 20px; }
+    .mode-name { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin-bottom: 10px; }
+    .mode-desc { font-size: 14px; color: var(--text-muted); line-height: 1.7; margin-bottom: 20px; }
+    .mode-tag { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+    .tag-free { background: rgba(108,99,255,.15); color: var(--accent); }
+    .tag-precise { background: rgba(54,211,153,.15); color: var(--accent3); }
+
+    /* ══════════════════════════════════════════
+       SCREEN: SETUP (PRECISION)
+    ══════════════════════════════════════════ */
+    #screen-setup { display: none; max-width: 600px; margin: 0 auto; }
+    .setup-header { text-align: center; margin-bottom: 36px; }
+    .setup-header h2 { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+    .setup-header p { color: var(--text-muted); margin-top: 8px; }
+
+    /* ══════════════════════════════════════════
+       SCREEN: CALIBRATE
+    ══════════════════════════════════════════ */
+    #screen-calibrate { display: none; max-width: 650px; margin: 0 auto; text-align: center; }
+    .cal-icon { font-size: 56px; margin-bottom: 20px; }
+    .cal-title { font-size: 26px; font-weight: 800; margin-bottom: 10px; letter-spacing: -.5px; }
+    .cal-sub { color: var(--text-muted); margin-bottom: 36px; font-size: 15px; line-height: 1.6; }
+    .cal-steps { display: flex; flex-direction: column; gap: 14px; text-align: left; margin-bottom: 36px; }
+    .cal-step {
+      display: flex; align-items: center; gap: 16px;
+      padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    }
+    .cal-step-num {
+      width: 36px; height: 36px; border-radius: 50%; font-weight: 700; font-size: 14px;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .cal-step-num.bottom { background: rgba(255,99,132,.15); color: var(--accent2); }
+    .cal-step-num.top    { background: rgba(108,99,255,.15);  color: var(--accent); }
+    .cal-step-text { font-size: 14px; line-height: 1.5; }
+    .cal-step-text strong { display: block; margin-bottom: 2px; }
+    .cal-step-text span { color: var(--text-muted); font-size: 13px; }
+    .cal-btn-row { display: flex; gap: 12px; justify-content: center; }
+    .cal-status {
+      margin-top: 24px; padding: 14px 20px; border-radius: 12px;
+      background: rgba(54,211,153,.08); border: 1px solid rgba(54,211,153,.2);
+      color: var(--accent3); font-size: 13px; font-weight: 600;
+      display: none;
+    }
+    .cal-status.show { display: block; animation: fadeIn .3s ease; }
+
+    /* ══════════════════════════════════════════
+       SCREEN: WORKOUT
+    ══════════════════════════════════════════ */
+    #screen-workout { display: none; max-width: 1200px; margin: 0 auto; }
+
+    .workout-topbar {
+      display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+    }
+    .session-timer {
+      font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.5px;
+    }
+    .session-timer span { color: var(--text-muted); font-weight: 400; font-size: 13px; margin-right: 6px; }
+    .set-indicator {
+      padding: 6px 16px; border-radius: 20px;
+      background: rgba(108,99,255,.12); border: 1px solid rgba(108,99,255,.25);
+      font-size: 13px; font-weight: 700; color: var(--accent);
+    }
+    .mode-indicator {
+      margin-left: auto;
+      padding: 6px 14px; border-radius: 20px;
+      background: var(--surface); border: 1px solid var(--border);
+      font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px;
+    }
+    .end-btn { margin-left: auto; }
+
+    /* Workout stats grid */
+    .workout-stats {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px;
+    }
+    .stat {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px;
+    }
+    .stat-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 6px; }
+    .stat-value { font-size: 26px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+    .stat-value .unit { font-size: 13px; font-weight: 400; color: var(--text-muted); }
+    .stat-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Precision rep progress */
+    .rep-progress {
+      display: none; margin-bottom: 20px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 20px;
+    }
+    .rep-progress.show { display: block; }
+    .rep-progress-header { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+    .rep-dots { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rep-dot {
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700;
+      transition: all .3s;
+    }
+    .rep-dot.done { background: var(--accent3); border-color: var(--accent3); color: #000; }
+    .rep-dot.current { border-color: var(--accent); animation: pulse-ring 1s infinite; }
+    @keyframes pulse-ring { 0%,100%{box-shadow:0 0 0 0 rgba(108,99,255,.4)}50%{box-shadow:0 0 0 6px rgba(108,99,255,0)} }
+
+    /* Phase badge */
+    .phase-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .phase-badge {
+      display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px;
+      border-radius: 20px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+    }
+    .phase-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .ph-BOTTOM_PAUSE { background:rgba(255,99,132,.15);  color:var(--bottom-pause); }
+    .ph-CONCENTRIC   { background:rgba(54,211,153,.15);  color:var(--concentric); }
+    .ph-TOP_PAUSE    { background:rgba(108,99,255,.15);  color:var(--top-pause); }
+    .ph-ECCENTRIC    { background:rgba(245,158,11,.15);  color:var(--eccentric); }
+    .ph-MID_HOLD     { background:rgba(100,116,139,.15); color:var(--mid-hold); }
+    .ph-NOT_CAL      { background:rgba(42,42,58,.5);     color:var(--text-muted); }
+    .tut-vs-target { font-size: 13px; color: var(--text-muted); }
+    .tut-vs-target strong { color: var(--text); }
+
+    /* Progress bar */
+    .progress-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-bottom: 20px; }
+    .progress-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
+    .progress-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .8px; }
+    .progress-pct { font-size: 20px; font-weight: 700; }
+    .progress-track { height: 10px; background: var(--surface2); border-radius: 5px; overflow: hidden; }
+    .progress-fill {
+      height: 100%; border-radius: 5px; transition: width .08s linear;
+      background: linear-gradient(90deg, var(--bottom-pause), var(--accent), var(--top-pause));
+      position: relative;
+    }
+    .progress-fill::after { content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,.8);border-radius:2px; }
+    .progress-labels { display:flex;justify-content:space-between;margin-top:6px;font-size:11px;color:var(--text-muted); }
+
+    /* Real-time chart */
+    .chart-section { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px 22px; margin-bottom: 20px; }
+    #posChart { width: 100%; height: 180px; display: block; border-radius: 6px; }
+
+    /* Bottom panels grid */
+    .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Rep list */
+    #repList { display: flex; flex-direction: column; gap: 6px; max-height: 200px; overflow-y: auto; }
+    #repList::-webkit-scrollbar { width:3px; }
+    #repList::-webkit-scrollbar-thumb { background:var(--border);border-radius:2px; }
+    .rep-item { display:flex;align-items:center;padding:9px 14px;background:var(--surface2);border-radius:8px;border-left:3px solid var(--accent);animation:slideIn .3s ease; }
+    @keyframes slideIn { from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)} }
+    .rep-num { font-size:12px;font-weight:700;color:var(--text-muted);width:36px; }
+    .rep-set { font-size:11px;color:var(--text-muted);width:40px; }
+    .rep-bar-wrap { flex:1;height:5px;background:var(--surface);border-radius:3px;margin:0 10px;overflow:hidden; }
+    .rep-bar { height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+    .rep-tut { font-size:14px;font-weight:700; }
+    .rep-tut .over { color:var(--accent3); }
+    .rep-tut .under { color:var(--accent4); }
+
+    /* TUT breakdown */
+    .breakdown-row { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
+    .bd-label { font-size:12px;color:var(--text-muted);width:90px; }
+    .bd-bar-wrap { flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden; }
+    .bd-bar { height:100%;border-radius:4px;transition:width .5s; }
+    .bd-val { font-size:12px;font-weight:600;width:40px;text-align:right; }
+    .bar-c { background:var(--concentric); }
+    .bar-e { background:var(--eccentric); }
+    .bar-t { background:var(--top-pause); }
+
+    /* ══════════════════════════════════════════
+       REST OVERLAY
+    ══════════════════════════════════════════ */
+    #rest-overlay {
+      display:none;position:fixed;inset:0;z-index:500;
+      background:rgba(7,7,13,.96);backdrop-filter:blur(16px);
+      align-items:center;justify-content:center;flex-direction:column;
+      text-align:center;
+    }
+    #rest-overlay.show { display:flex; }
+    .rest-header { font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--accent3);margin-bottom:10px; }
+    .rest-set-info { font-size:18px;font-weight:700;margin-bottom:40px;color:var(--text-muted); }
+    .rest-circle-wrap { position:relative;width:200px;height:200px;margin:0 auto 36px; }
+    #restCanvas { position:absolute;inset:0;width:100%;height:100%; }
+    .rest-time-display { position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center; }
+    .rest-seconds { font-size:64px;font-weight:900;letter-spacing:-3px;line-height:1; }
+    .rest-label { font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px; }
+    .rest-next-label { font-size:16px;color:var(--text-muted);margin-bottom:28px; }
+    .rest-next-label strong { color:var(--text); }
+
+    /* ══════════════════════════════════════════
+       SCREEN: SUMMARY
+    ══════════════════════════════════════════ */
+    #screen-summary { display:none;max-width:800px;margin:0 auto; }
+    .summary-header { text-align:center;margin-bottom:36px; }
+    .summary-icon { font-size:56px;margin-bottom:12px; }
+    .summary-title { font-size:30px;font-weight:900;letter-spacing:-1px; }
+    .summary-sub { font-size:14px;color:var(--text-muted);margin-top:6px; }
+
+    .summary-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px; }
+    .s-card { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 20px; }
+    .s-label { font-size:11px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px; }
+    .s-value { font-size:28px;font-weight:800;letter-spacing:-1px; }
+    .s-unit { font-size:13px;font-weight:400;color:var(--text-muted); }
+
+    .summary-breakdown { background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:20px; }
+    #summaryTutChart { width:100%;height:120px;display:block;border-radius:6px; }
+
+    .summary-actions { display:flex;gap:12px;justify-content:center;margin-top:8px; }
+
+    /* ══════════════════════════════════════════
+       PHASE TIMELINE
+    ══════════════════════════════════════════ */
+    .timeline-bar { display:flex;height:36px;border-radius:8px;overflow:hidden;border:1px solid var(--border); }
+    .tb-seg { height:100%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;overflow:hidden;white-space:nowrap; }
+    .tb-BOTTOM_PAUSE{background:rgba(255,99,132,.3);color:var(--bottom-pause);}
+    .tb-CONCENTRIC{background:rgba(54,211,153,.3);color:var(--concentric);}
+    .tb-TOP_PAUSE{background:rgba(108,99,255,.3);color:var(--top-pause);}
+    .tb-ECCENTRIC{background:rgba(245,158,11,.3);color:var(--eccentric);}
+    .tb-MID_HOLD{background:rgba(100,116,139,.2);color:var(--mid-hold);}
+    .tb-NOT_CAL{background:var(--surface2);color:var(--text-muted);}
+
+    /* ══════════════════════════════════════════
+       EMPTY STATES
+    ══════════════════════════════════════════ */
+    .empty-state { display:flex;flex-direction:column;align-items:center;justify-content:center;height:140px;gap:8px;color:var(--text-muted); }
+    .empty-icon { font-size:32px;opacity:.3; }
+    .empty-text { font-size:13px; }
+
+    @media (max-width:900px) {
+      header { padding:0 16px; }
+      .screen { padding:20px 16px; }
+      .workout-stats { grid-template-columns:repeat(2,1fr); }
+      .bottom-grid,.summary-grid,.mode-grid { grid-template-columns:1fr; }
+      .form-row { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     HEADER
+═══════════════════════════════════════ -->
+<header>
+  <a class="logo" href="#" onclick="goHome();return false;">
+    <div class="logo-icon">💪</div>
+    <div>
+      <div class="logo-title">SmartTUT</div>
+      <div class="logo-sub">Biceps Curl Tracker</div>
+    </div>
+  </a>
+  <div class="header-right">
+    <div class="session-badge" id="sessionBadge">
+      <div class="live-dot"></div>
+      <span id="sessionTimerHeader">00:00</span>
+    </div>
+    <button id="connectBtn" onclick="toggleConnect()">
+      <div class="ble-dot" id="bleDot"></div>
+      <span id="connectLabel">Connect BLE</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════
+     SCREEN: CONNECT
+═══════════════════════════════════════ -->
+<div class="screen active" id="screen-connect">
+  <div class="connect-hero">
+    <div class="connect-icon">💪</div>
+    <h1 class="connect-title" style="font-size:36px;font-weight:900;letter-spacing:-1.5px;margin-bottom:12px;">SmartTUT</h1>
+    <p class="connect-sub" style="font-size:16px;color:var(--text-muted);max-width:400px;margin:0 auto 40px;line-height:1.6;">
+      Real-time biceps curl tracker with Time Under Tension analysis. Connect your wristband to begin.
+    </p>
+  </div>
+  <div class="connect-steps">
+    <div class="step-card">
+      <div class="step-num">Step 1</div>
+      <div class="step-text">Turn on your SmartTUT wristband using the power switch</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">Step 2</div>
+      <div class="step-text">Click "Connect BLE" and select <strong>SmartTUT</strong> from the list</div>
+    </div>
+    <div class="step-card">
+      <div class="step-num">Step 3</div>
+      <div class="step-text">Choose Freestyle or Precision mode and calibrate</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" style="font-size:17px;padding:16px 48px;" onclick="toggleConnect()">
+    🔷 Connect BLE
+  </button>
+  <p style="margin-top:16px;font-size:12px;color:var(--text-muted);">Requires Google Chrome with Bluetooth enabled</p>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN: MODE SELECT
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-mode">
+  <h2 class="mode-title">Choose Your Workout Mode</h2>
+  <p class="mode-sub">You can always come back and start a new session</p>
+  <div class="mode-grid">
+    <div class="mode-card" onclick="selectMode('freestyle')">
+      <div class="mode-icon">🎯</div>
+      <div class="mode-name">Freestyle</div>
+      <div class="mode-desc">No restrictions. Curl as many reps as you want, stop when you're done. Perfect for warm-ups and intuitive training.</div>
+      <span class="mode-tag tag-free">Open session</span>
+    </div>
+    <div class="mode-card precision" onclick="selectMode('precision')">
+      <div class="mode-icon">📊</div>
+      <div class="mode-name">Precision</div>
+      <div class="mode-desc">Define your sets, reps, target TUT, rest periods, and weight. Track total work done and compare against your targets.</div>
+      <span class="mode-tag tag-precise">Structured training</span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN: PRECISION SETUP
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-setup">
+  <div class="setup-header">
+    <h2>Precision Setup</h2>
+    <p>Configure your workout before starting</p>
+  </div>
+  <div class="card" style="max-width:560px;margin:0 auto;">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Sets</label>
+        <input class="form-input" id="setupSets" type="number" value="3" min="1" max="20" placeholder="3">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Reps per Set</label>
+        <input class="form-input" id="setupReps" type="number" value="10" min="1" max="50" placeholder="10">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Target TUT per Rep (s)</label>
+        <input class="form-input" id="setupTut" type="number" value="4" min="1" max="30" step="0.5" placeholder="4">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Rest Between Sets (s)</label>
+        <input class="form-input" id="setupRest" type="number" value="60" min="10" max="300" placeholder="60">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Weight</label>
+        <input class="form-input" id="setupWeight" type="number" value="0" min="0" max="200" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Unit</label>
+        <div class="unit-toggle">
+          <button class="unit-btn active" id="unitLbs" onclick="setUnit('lbs')">lbs</button>
+          <button class="unit-btn" id="unitKg" onclick="setUnit('kg')">kg</button>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <button class="btn btn-secondary" style="flex:1;" onclick="showScreen('mode')">← Back</button>
+      <button class="btn btn-primary" style="flex:2;" onclick="confirmSetup()">Start Calibration →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN: CALIBRATE
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-calibrate">
+  <div class="cal-icon">🎯</div>
+  <h2 class="cal-title">Calibrate Your Wristband</h2>
+  <p class="cal-sub">Hold each position still for ~2.5 seconds while sending the command. The session starts automatically once calibration is complete.</p>
+
+  <div class="cal-steps">
+    <div class="cal-step">
+      <div class="cal-step-num bottom">1</div>
+      <div class="cal-step-text">
+        <strong>Hold arm down (BOTTOM position)</strong>
+        <span>Arm fully extended at your side → send command <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;">b</code></span>
+      </div>
+    </div>
+    <div class="cal-step">
+      <div class="cal-step-num top">2</div>
+      <div class="cal-step-text">
+        <strong>Hold arm up (TOP position)</strong>
+        <span>Arm fully curled at shoulder → send command <code style="background:var(--surface2);padding:2px 6px;border-radius:4px;">t</code></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="cal-btn-row">
+    <button class="btn btn-danger btn-sm" onclick="sendCmd('b')">📍 b — BOTTOM</button>
+    <button class="btn btn-primary btn-sm" onclick="sendCmd('t')">🔝 t — TOP</button>
+    <button class="btn btn-secondary btn-sm" onclick="sendCmd('r')">🔄 Reset</button>
+  </div>
+  <div class="cal-status" id="calStatus">✅ Calibration complete — starting session...</div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN: WORKOUT
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-workout">
+
+  <!-- Top bar -->
+  <div class="workout-topbar">
+    <div>
+      <div style="font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">Session Time</div>
+      <div class="session-timer"><span id="sessionTimerMain">00:00</span></div>
+    </div>
+    <div class="set-indicator" id="setIndicator" style="display:none;">Set 1/3</div>
+    <div class="mode-indicator" id="modeIndicator">FREESTYLE</div>
+    <button class="btn btn-danger btn-sm end-btn" onclick="endSession()">■ End Session</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="workout-stats">
+    <div class="stat" style="border-color:rgba(108,99,255,.3);">
+      <div class="stat-label">Reps</div>
+      <div class="stat-value" id="wRepCount" style="color:var(--accent)">—</div>
+      <div class="stat-sub" id="wRepSub">completed</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Last Rep TUT</div>
+      <div class="stat-value" id="wLastTut">—<span class="unit">s</span></div>
+      <div class="stat-sub" id="wTutComparison">—</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total TUT</div>
+      <div class="stat-value" id="wTotalTut">—<span class="unit">s</span></div>
+      <div class="stat-sub">active time</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Avg TUT / Rep</div>
+      <div class="stat-value" id="wAvgTut">—<span class="unit">s</span></div>
+      <div class="stat-sub">this session</div>
+    </div>
+  </div>
+
+  <!-- Precision rep dots -->
+  <div class="rep-progress card" id="repProgressBar">
+    <div class="rep-progress-header">
+      <span id="repProgressLabel" style="font-weight:600;">Set 1 Progress</span>
+      <span id="repProgressCount" style="color:var(--text-muted);">0 / 10</span>
+    </div>
+    <div class="rep-dots" id="repDots"></div>
+  </div>
+
+  <!-- Phase + progress -->
+  <div class="card" style="margin-bottom:20px;">
+    <div class="phase-row">
+      <div id="phaseBadge" class="phase-badge ph-NOT_CAL"><span class="phase-dot"></span>NOT CALIBRATED</div>
+      <div class="tut-vs-target" id="tutVsTarget" style="display:none;">
+        Target: <strong id="tutTargetDisplay">4.0s</strong> per rep
+      </div>
+      <div style="margin-left:auto;font-size:13px;color:var(--text-muted);" id="posDisplay">—</div>
+    </div>
+    <div class="progress-section" style="background:transparent;border:none;padding:0;">
+      <div class="progress-header">
+        <span class="progress-title">Range of Motion</span>
+        <span class="progress-pct" id="progressPct">—%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressBar" style="width:0%"></div>
+      </div>
+      <div class="progress-labels"><span>⬇ BOTTOM</span><span>MID</span><span>TOP ⬆</span></div>
+    </div>
+  </div>
+
+  <!-- Real-time chart -->
+  <div class="chart-section card" style="margin-bottom:20px;">
+    <div class="card-title">Real-Time Position (last 30s)</div>
+    <canvas id="posChart"></canvas>
+  </div>
+
+  <!-- Bottom panels -->
+  <div class="bottom-grid">
+    <div class="card">
+      <div class="card-title">Rep List</div>
+      <div id="repList">
+        <div class="empty-state"><div class="empty-icon">💪</div><div class="empty-text">Complete a rep to see data</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">TUT Breakdown</div>
+      <div class="breakdown-row">
+        <div class="bd-label">Concentric</div>
+        <div class="bd-bar-wrap"><div class="bd-bar bar-c" id="bdC" style="width:0%"></div></div>
+        <div class="bd-val" id="bdCv">—</div>
+      </div>
+      <div class="breakdown-row">
+        <div class="bd-label">Eccentric</div>
+        <div class="bd-bar-wrap"><div class="bd-bar bar-e" id="bdE" style="width:0%"></div></div>
+        <div class="bd-val" id="bdEv">—</div>
+      </div>
+      <div class="breakdown-row">
+        <div class="bd-label">Top Pause</div>
+        <div class="bd-bar-wrap"><div class="bd-bar bar-t" id="bdT" style="width:0%"></div></div>
+        <div class="bd-val" id="bdTv">—</div>
+      </div>
+      <div style="margin-top:18px;">
+        <div class="card-title">Phase Timeline (last 60s)</div>
+        <div class="timeline-bar" id="phaseTimeline"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     REST OVERLAY
+═══════════════════════════════════════ -->
+<div id="rest-overlay">
+  <div class="rest-header">🏋️ SET COMPLETE</div>
+  <div class="rest-set-info" id="restSetInfo">Rest before Set 2</div>
+  <div class="rest-circle-wrap">
+    <canvas id="restCanvas" width="200" height="200"></canvas>
+    <div class="rest-time-display">
+      <div class="rest-seconds" id="restSeconds">60</div>
+      <div class="rest-label">seconds</div>
+    </div>
+  </div>
+  <div class="rest-next-label">Up next: <strong id="restNextLabel">Set 2 — 10 reps</strong></div>
+  <button class="btn btn-success" onclick="skipRest()">Skip Rest →</button>
+</div>
+
+<!-- ═══════════════════════════════════════
+     SCREEN: SUMMARY
+═══════════════════════════════════════ -->
+<div class="screen" id="screen-summary">
+  <div class="summary-header">
+    <div class="summary-icon">🏆</div>
+    <h2 class="summary-title">Workout Complete!</h2>
+    <p class="summary-sub" id="summaryDate">—</p>
+  </div>
+
+  <div class="summary-grid">
+    <div class="s-card">
+      <div class="s-label">Total Reps</div>
+      <div class="s-value" id="sumReps" style="color:var(--accent)">—</div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">Sets Completed</div>
+      <div class="s-value" id="sumSets">—</div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">Session Duration</div>
+      <div class="s-value" id="sumDuration">—</div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">Total TUT</div>
+      <div class="s-value" id="sumTut">—<span class="s-unit">s</span></div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">Best Rep TUT</div>
+      <div class="s-value" id="sumBest">—<span class="s-unit">s</span></div>
+    </div>
+    <div class="s-card">
+      <div class="s-label">Avg TUT / Rep</div>
+      <div class="s-value" id="sumAvg">—<span class="s-unit">s</span></div>
+    </div>
+  </div>
+
+  <div class="summary-breakdown card" style="margin-bottom:16px;">
+    <div class="card-title">TUT Breakdown</div>
+    <canvas id="summaryTutChart"></canvas>
+  </div>
+
+  <div class="card" id="workCard" style="margin-bottom:20px;display:none;">
+    <div class="card-title">Total Mechanical Work</div>
+    <div style="font-size:36px;font-weight:900;letter-spacing:-1px;" id="sumWork">—</div>
+    <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">Weight × Total TUT — a real coaching performance metric</div>
+  </div>
+
+  <div class="summary-actions">
+    <button class="btn btn-secondary" onclick="goHome()">← New Session</button>
+    <button class="btn btn-primary" onclick="exportSummary()">📋 Copy Summary</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════ -->
+<script>
+// ────────────────────────────────────────
+// BLE CONFIG
+// ────────────────────────────────────────
+const SERVICE_UUID   = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+const CHAR_DATA_UUID = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+const CHAR_CMD_UUID  = '1c95d5e3-d8f4-4ed7-a235-72e97b79b6b0';
+const PHASES    = ['NOT_CAL','BOTTOM_PAUSE','CONCENTRIC','TOP_PAUSE','ECCENTRIC','MID_HOLD'];
+const POSITIONS = ['BOTTOM','MID','TOP','---'];
+
+let bleDevice, bleServer, dataChar, cmdChar, connected = false;
+
+// ────────────────────────────────────────
+// APP STATE
+// ────────────────────────────────────────
+const cfg = {
+  mode: null,
+  totalSets: 3, repsPerSet: 10, targetTut: 4,
+  restSeconds: 60, weight: 0, weightUnit: 'lbs'
+};
+
+const sess = {
+  startTime: null, endTime: null,
+  calibrated: false,
+  currentSet: 1, repsThisSet: 0,
+  prevRepCount: 0,
+  repHistory: [],
+  phaseAccum: {CONCENTRIC:0, ECCENTRIC:0, TOP_PAUSE:0, BOTTOM_PAUSE:0, MID_HOLD:0},
+  phaseLog: [],   // for timeline [{phase,ts,end}]
+  chartData: [],  // [{ts,pos,phase}]
+  repMarkers: [], // [{ts,rep}]
+  inRest: false, restTimer: null,
+  lastPacket: null
+};
+
+// ────────────────────────────────────────
+// SCREEN NAVIGATION
+// ────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + id);
+  if (el) { el.classList.add('active'); }
+}
+
+function goHome() {
+  resetSession();
+  if (connected) showScreen('mode');
+  else showScreen('connect');
+}
+
+// ────────────────────────────────────────
+// BLE
+// ────────────────────────────────────────
+async function toggleConnect() {
+  if (connected) { bleDevice?.gatt?.disconnect(); return; }
+  try {
+    setBleState('connecting');
+    bleDevice = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'SmartTUT' }],
+      optionalServices: [SERVICE_UUID]
+    });
+    bleDevice.addEventListener('gattserverdisconnected', onBleDisconnect);
+    bleServer = await bleDevice.gatt.connect();
+    const svc = await bleServer.getPrimaryService(SERVICE_UUID);
+    dataChar  = await svc.getCharacteristic(CHAR_DATA_UUID);
+    cmdChar   = await svc.getCharacteristic(CHAR_CMD_UUID);
+    await dataChar.startNotifications();
+    dataChar.addEventListener('characteristicvaluechanged', onBleData);
+    connected = true;
+    setBleState('connected');
+    showScreen('mode');
+  } catch(e) {
+    setBleState('disconnected');
+    if (!e.message?.includes('cancelled') && !e.message?.includes('User cancelled'))
+      alert('BLE Error: ' + e.message);
+  }
+}
+
+function onBleDisconnect() {
+  connected = false; dataChar = cmdChar = null;
+  setBleState('disconnected');
+}
+
+function setBleState(state) {
+  const btn = document.getElementById('connectBtn');
+  const lbl = document.getElementById('connectLabel');
+  const dot = document.getElementById('bleDot');
+  if (state === 'connected') {
+    btn.className = 'connected'; lbl.textContent = 'Disconnect'; dot.className = 'ble-dot pulse';
+  } else if (state === 'connecting') {
+    btn.className = 'connecting'; lbl.textContent = 'Connecting...'; dot.className = 'ble-dot pulse';
+  } else {
+    btn.className = ''; lbl.textContent = 'Connect BLE'; dot.className = 'ble-dot';
+  }
+}
+
+async function sendCmd(cmd) {
+  if (!cmdChar) { alert('Not connected!'); return; }
+  try { await cmdChar.writeValue(new TextEncoder().encode(cmd)); }
+  catch(e) { console.error('BLE write error:', e); }
+}
+
+// ────────────────────────────────────────
+// BLE DATA HANDLER
+// ────────────────────────────────────────
+function onBleData(e) {
+  const d = new DataView(e.target.value.buffer);
+  const p = {
+    progress:  d.getUint8(0)  / 100,
+    phase:     d.getUint8(1),
+    position:  d.getUint8(2),
+    repCount:  d.getUint8(3),
+    activeTut: d.getUint32(4, true) / 1000,
+    lastTut:   d.getUint16(8, true) / 1000,
+    rate:      d.getInt8(10) / 10,
+    flags:     d.getUint8(11),
+  };
+  p.calibrated  = (p.flags & 0x01) !== 0;
+  p.phaseName   = PHASES[p.phase]    || 'NOT_CAL';
+  p.positionName= POSITIONS[p.position] || '---';
+  sess.lastPacket = p;
+
+  // Calibration detection → auto-start session
+  if (p.calibrated && !sess.calibrated) {
+    sess.calibrated  = true;
+    sess.startTime   = Date.now();
+    document.getElementById('calStatus').classList.add('show');
+    document.getElementById('sessionBadge').classList.add('show');
+    setTimeout(() => showScreen('workout'), 800);
+  }
+
+  // Accumulate phase time
+  if (sess.startTime && !sess.inRest) {
+    if (sess.phaseAccum[p.phaseName] !== undefined)
+      sess.phaseAccum[p.phaseName] += 100;
+  }
+
+  // Chart data (last 30s)
+  if (sess.startTime) {
+    const now = Date.now();
+    sess.chartData.push({ ts: now, pos: p.progress * 100, phase: p.phaseName });
+    const cutoff = now - 30000;
+    while (sess.chartData.length && sess.chartData[0].ts < cutoff) sess.chartData.shift();
+  }
+
+  // Phase log (for timeline)
+  const now = Date.now();
+  if (!sess.phaseLog.length || sess.phaseLog[sess.phaseLog.length-1].phase !== p.phaseName) {
+    sess.phaseLog.push({ phase: p.phaseName, ts: now, end: now });
+  } else {
+    sess.phaseLog[sess.phaseLog.length-1].end = now;
+  }
+  sess.phaseLog = sess.phaseLog.filter(x => x.end > now - 60000);
+
+  // New rep detection
+  if (p.repCount > sess.prevRepCount && p.lastTut > 0) {
+    for (let i = sess.prevRepCount + 1; i <= p.repCount; i++) {
+      sess.repHistory.push({ rep: i, set: sess.currentSet, tut: p.lastTut, ts: now });
+      sess.repMarkers.push({ ts: now, rep: i });
+      sess.repsThisSet++;
+
+      if (cfg.mode === 'precision' && sess.repsThisSet >= cfg.repsPerSet) {
+        if (sess.currentSet < cfg.totalSets) {
+          startRest();
+        } else {
+          setTimeout(endSession, 500);
+        }
+      }
+    }
+    sess.prevRepCount = p.repCount;
+  }
+
+  updateWorkoutUI(p);
+}
+
+// ────────────────────────────────────────
+// MODE SELECTION
+// ────────────────────────────────────────
+function selectMode(mode) {
+  cfg.mode = mode;
+  if (mode === 'freestyle') {
+    showScreen('calibrate');
+  } else {
+    showScreen('setup');
+  }
+}
+
+function setUnit(unit) {
+  cfg.weightUnit = unit;
+  document.getElementById('unitLbs').classList.toggle('active', unit === 'lbs');
+  document.getElementById('unitKg').classList.toggle('active',  unit === 'kg');
+}
+
+function confirmSetup() {
+  cfg.totalSets  = parseInt(document.getElementById('setupSets').value)  || 3;
+  cfg.repsPerSet = parseInt(document.getElementById('setupReps').value)   || 10;
+  cfg.targetTut  = parseFloat(document.getElementById('setupTut').value)  || 4;
+  cfg.restSeconds= parseInt(document.getElementById('setupRest').value)   || 60;
+  cfg.weight     = parseFloat(document.getElementById('setupWeight').value)|| 0;
+  showScreen('calibrate');
+}
+
+// ────────────────────────────────────────
+// SESSION MANAGEMENT
+// ────────────────────────────────────────
+function startSessionUI() {
+  // Set indicators
+  document.getElementById('modeIndicator').textContent = cfg.mode === 'precision' ? 'PRECISION' : 'FREESTYLE';
+  const si = document.getElementById('setIndicator');
+  if (cfg.mode === 'precision') {
+    si.style.display = 'flex';
+    si.textContent = `Set 1/${cfg.totalSets}`;
+    document.getElementById('repProgressBar').classList.add('show');
+    document.getElementById('tutVsTarget').style.display = 'flex';
+    document.getElementById('tutTargetDisplay').textContent = cfg.targetTut.toFixed(1) + 's';
+  }
+  buildRepDots();
+}
+
+function buildRepDots() {
+  if (cfg.mode !== 'precision') return;
+  const container = document.getElementById('repDots');
+  container.innerHTML = '';
+  for (let i = 1; i <= cfg.repsPerSet; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'rep-dot' + (i === 1 ? ' current' : '');
+    dot.id = `dot_${i}`;
+    dot.textContent = i;
+    container.appendChild(dot);
+  }
+  document.getElementById('repProgressLabel').textContent = `Set ${sess.currentSet} Progress`;
+  document.getElementById('repProgressCount').textContent = `0 / ${cfg.repsPerSet}`;
+}
+
+function updateRepDots() {
+  for (let i = 1; i <= cfg.repsPerSet; i++) {
+    const dot = document.getElementById(`dot_${i}`);
+    if (!dot) continue;
+    dot.classList.remove('done','current');
+    if (i <= sess.repsThisSet) dot.classList.add('done');
+    else if (i === sess.repsThisSet + 1) dot.classList.add('current');
+  }
+  document.getElementById('repProgressCount').textContent = `${sess.repsThisSet} / ${cfg.repsPerSet}`;
+}
+
+// ────────────────────────────────────────
+// REST TIMER
+// ────────────────────────────────────────
+function startRest() {
+  sess.inRest = true;
+  const nextSet = sess.currentSet + 1;
+  document.getElementById('restSetInfo').textContent = `Rest before Set ${nextSet} of ${cfg.totalSets}`;
+  document.getElementById('restNextLabel').textContent = `Set ${nextSet} — ${cfg.repsPerSet} reps`;
+
+  let remaining = cfg.restSeconds;
+  document.getElementById('restSeconds').textContent = remaining;
+  drawRestArc(remaining / cfg.restSeconds);
+
+  document.getElementById('rest-overlay').classList.add('show');
+
+  sess.restTimer = setInterval(() => {
+    remaining--;
+    document.getElementById('restSeconds').textContent = remaining;
+    drawRestArc(remaining / cfg.restSeconds);
+    if (remaining <= 0) skipRest();
+  }, 1000);
+}
+
+function skipRest() {
+  clearInterval(sess.restTimer);
+  document.getElementById('rest-overlay').classList.remove('show');
+  sess.currentSet++;
+  sess.repsThisSet = 0;
+  sess.inRest = false;
+  // Update UI for next set
+  document.getElementById('setIndicator').textContent = `Set ${sess.currentSet}/${cfg.totalSets}`;
+  document.getElementById('repProgressLabel').textContent = `Set ${sess.currentSet} Progress`;
+  buildRepDots();
+  sendCmd('r'); // reset rep counter on firmware
+}
+
+function drawRestArc(fraction) {
+  const canvas = document.getElementById('restCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width = 200, H = canvas.height = 200;
+  const cx = W/2, cy = H/2, r = 85, lw = 10;
+  ctx.clearRect(0,0,W,H);
+  // Track
+  ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+  ctx.strokeStyle='rgba(255,255,255,.08)'; ctx.lineWidth=lw; ctx.stroke();
+  // Progress arc (from top, clockwise)
+  const start = -Math.PI/2;
+  const end   = start + Math.PI*2*fraction;
+  const grad  = ctx.createLinearGradient(cx-r,cy,cx+r,cy);
+  grad.addColorStop(0,'#36d399'); grad.addColorStop(1,'#6c63ff');
+  ctx.beginPath(); ctx.arc(cx,cy,r,start,end);
+  ctx.strokeStyle=grad; ctx.lineWidth=lw; ctx.lineCap='round'; ctx.stroke();
+}
+
+// ────────────────────────────────────────
+// END SESSION
+// ────────────────────────────────────────
+function endSession() {
+  clearInterval(sess.restTimer);
+  document.getElementById('rest-overlay').classList.remove('show');
+  sess.endTime = Date.now();
+  document.getElementById('sessionBadge').classList.remove('show');
+  clearInterval(timerInterval);
+  showScreen('summary');
+  renderSummary();
+}
+
+// ────────────────────────────────────────
+// WORKOUT UI UPDATE
+// ────────────────────────────────────────
+function updateWorkoutUI(p) {
+  const pct = Math.round(p.progress * 100);
+
+  // Phase badge
+  const pb = document.getElementById('phaseBadge');
+  pb.className = `phase-badge ph-${p.phaseName}`;
+  pb.innerHTML = `<span class="phase-dot" style="background:currentColor;width:8px;height:8px;border-radius:50%;"></span>${p.phaseName.replace(/_/g,' ')}`;
+
+  // Progress
+  document.getElementById('progressPct').textContent = pct + '%';
+  document.getElementById('progressBar').style.width  = pct + '%';
+  document.getElementById('posDisplay').textContent   = p.positionName;
+
+  // Stats
+  const reps = sess.repHistory.length;
+  document.getElementById('wRepCount').textContent = reps || '—';
+  if (cfg.mode === 'precision') {
+    document.getElementById('wRepSub').textContent = `${sess.repsThisSet}/${cfg.repsPerSet} this set`;
+  }
+
+  if (p.lastTut > 0) {
+    document.getElementById('wLastTut').innerHTML = `${p.lastTut.toFixed(2)}<span class="unit">s</span>`;
+    if (cfg.mode === 'precision') {
+      const diff = p.lastTut - cfg.targetTut;
+      const cl   = diff >= 0 ? '#36d399' : '#f59e0b';
+      const sign = diff >= 0 ? '+' : '';
+      document.getElementById('wTutComparison').innerHTML = `<span style="color:${cl}">${sign}${diff.toFixed(2)}s vs target</span>`;
+    }
+  }
+  document.getElementById('wTotalTut').innerHTML = `${p.activeTut.toFixed(1)}<span class="unit">s</span>`;
+
+  const avg = reps > 0 ? sess.repHistory.reduce((s,r)=>s+r.tut,0)/reps : 0;
+  document.getElementById('wAvgTut').innerHTML = reps > 0 ? `${avg.toFixed(2)}<span class="unit">s</span>` : '—';
+
+  // Rep dots (precision)
+  if (cfg.mode === 'precision') updateRepDots();
+
+  // Rep list
+  renderRepList();
+
+  // TUT breakdown
+  renderBreakdown();
+
+  // Phase timeline
+  renderTimeline();
+
+  // Chart (via rAF below)
+}
+
+// ────────────────────────────────────────
+// RENDER FUNCTIONS
+// ────────────────────────────────────────
+function renderRepList() {
+  const el = document.getElementById('repList');
+  if (!sess.repHistory.length) return;
+  const maxTut = Math.max(...sess.repHistory.map(r=>r.tut));
+  el.innerHTML = [...sess.repHistory].reverse().map(r => {
+    const iRef = cfg.mode === 'precision' && cfg.targetTut > 0;
+    const diff = iRef ? (r.tut - cfg.targetTut) : null;
+    const tutClass = diff === null ? '' : (diff >= 0 ? 'over' : 'under');
+    const setLabel = cfg.mode === 'precision' ? `S${r.set}` : '';
+    return `<div class="rep-item">
+      <div class="rep-num">R${r.rep}</div>
+      <div class="rep-set">${setLabel}</div>
+      <div class="rep-bar-wrap"><div class="rep-bar" style="width:${Math.min(100,r.tut/maxTut*100)}%"></div></div>
+      <div class="rep-tut"><span class="${tutClass}">${r.tut.toFixed(2)}<span style="font-size:10px;color:var(--text-muted)">s</span></span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderBreakdown() {
+  const c = sess.phaseAccum.CONCENTRIC   / 1000;
+  const e = sess.phaseAccum.ECCENTRIC    / 1000;
+  const t = sess.phaseAccum.TOP_PAUSE    / 1000;
+  const total = c + e + t || 1;
+  document.getElementById('bdC').style.width  = (c/total*100)+'%';
+  document.getElementById('bdE').style.width  = (e/total*100)+'%';
+  document.getElementById('bdT').style.width  = (t/total*100)+'%';
+  document.getElementById('bdCv').textContent = c.toFixed(1)+'s';
+  document.getElementById('bdEv').textContent = e.toFixed(1)+'s';
+  document.getElementById('bdTv').textContent = t.toFixed(1)+'s';
+}
+
+function renderTimeline() {
+  const el = document.getElementById('phaseTimeline');
+  if (!sess.phaseLog.length) { el.innerHTML='<div class="tb-seg tb-NOT_CAL" style="flex:1">No data</div>'; return; }
+  const total = sess.phaseLog.reduce((s,x)=>s+(x.end-x.ts),0)||1;
+  el.innerHTML = sess.phaseLog.map(x => {
+    const dur = x.end-x.ts;
+    const label = dur>2500 ? x.phase.replace(/_/g,' ') : '';
+    return `<div class="tb-seg tb-${x.phase}" style="flex:${dur/total}" title="${x.phase} (${(dur/1000).toFixed(1)}s)">${label}</div>`;
+  }).join('');
+}
+
+// ────────────────────────────────────────
+// REAL-TIME POSITION CHART
+// ────────────────────────────────────────
+const PHASE_COLORS = {
+  BOTTOM_PAUSE:'rgba(255,99,132,.12)',
+  CONCENTRIC:'rgba(54,211,153,.12)',
+  TOP_PAUSE:'rgba(108,99,255,.12)',
+  ECCENTRIC:'rgba(245,158,11,.12)',
+  MID_HOLD:'rgba(100,116,139,.08)',
+  NOT_CAL:'rgba(0,0,0,0)'
+};
+const PHASE_LINE_COLORS = {
+  BOTTOM_PAUSE:'#ff6384', CONCENTRIC:'#36d399',
+  TOP_PAUSE:'#6c63ff', ECCENTRIC:'#f59e0b',
+  MID_HOLD:'#64748b', NOT_CAL:'#444'
+};
+
+function drawPositionChart() {
+  const canvas = document.getElementById('posChart');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  const pad = {l:38,r:14,t:12,b:28};
+  const data = sess.chartData;
+  if (!data.length) { ctx.fillStyle='#3a3a55'; ctx.font='13px Inter'; ctx.textAlign='center'; ctx.fillText('Waiting for data...', W/2, H/2); return; }
+  const now  = Date.now();
+  const winMs = 30000;
+  const tMin  = now - winMs;
+
+  function xOf(ts) { return pad.l + ((ts-tMin)/winMs)*(W-pad.l-pad.r); }
+  function yOf(pos){ return pad.t + (1-pos/100)*(H-pad.t-pad.b); }
+
+  // Grid lines
+  ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+  for (let i=0; i<=4; i++) {
+    const y=pad.t+(i/4)*(H-pad.t-pad.b);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#3a3a55'; ctx.font=`10px Inter`; ctx.textAlign='right';
+    ctx.fillText(100-i*25+'%', pad.l-4, y+4);
+  }
+  // Time labels
+  for (let i=0; i<=3; i++) {
+    const ts=tMin+i*(winMs/3);
+    const age=((now-ts)/1000).toFixed(0)+'s ago';
+    const x=xOf(ts);
+    ctx.fillStyle='#3a3a55'; ctx.font='9px Inter'; ctx.textAlign='center';
+    ctx.fillText(i===3?'now':age, x, H-pad.b+14);
+  }
+
+  // Phase background bands
+  let bandStart=data[0]; let bandPhase=data[0].phase;
+  for (let i=1;i<data.length;i++) {
+    if (data[i].phase!==bandPhase||i===data.length-1) {
+      const x1=xOf(Math.max(bandStart.ts,tMin));
+      const x2=xOf(data[i].ts);
+      ctx.fillStyle=PHASE_COLORS[bandPhase]||'transparent';
+      ctx.fillRect(x1,pad.t,x2-x1,H-pad.t-pad.b);
+      bandStart=data[i]; bandPhase=data[i].phase;
+    }
+  }
+
+  // Rep markers
+  sess.repMarkers.forEach(m => {
+    if (m.ts < tMin) return;
+    const x=xOf(m.ts);
+    ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x,pad.t); ctx.lineTo(x,H-pad.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle='rgba(255,255,255,.5)'; ctx.font='bold 9px Inter'; ctx.textAlign='center';
+    ctx.fillText(`R${m.rep}`,x,pad.t+10);
+  });
+
+  // Position line (colored by phase)
+  const visible = data.filter(d=>d.ts>=tMin);
+  if (visible.length < 2) return;
+  for (let i=1;i<visible.length;i++) {
+    const prev=visible[i-1], cur=visible[i];
+    ctx.beginPath();
+    ctx.moveTo(xOf(prev.ts),yOf(prev.pos));
+    ctx.lineTo(xOf(cur.ts), yOf(cur.pos));
+    ctx.strokeStyle=PHASE_LINE_COLORS[cur.phase]||'#6c63ff';
+    ctx.lineWidth=2.5; ctx.lineCap='round'; ctx.stroke();
+  }
+  // Glow dot at latest point
+  const last = visible[visible.length-1];
+  const lx=xOf(last.ts), ly=yOf(last.pos);
+  ctx.fillStyle=PHASE_LINE_COLORS[last.phase]||'#6c63ff';
+  ctx.beginPath(); ctx.arc(lx,ly,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(255,255,255,.8)';
+  ctx.beginPath(); ctx.arc(lx,ly,2,0,Math.PI*2); ctx.fill();
+}
+
+// RAF loop for chart
+let rafId;
+function chartLoop() {
+  if (document.getElementById('screen-workout')?.classList.contains('active')) {
+    drawPositionChart();
+  }
+  rafId = requestAnimationFrame(chartLoop);
+}
+requestAnimationFrame(chartLoop);
+
+// ────────────────────────────────────────
+// SESSION TIMER
+// ────────────────────────────────────────
+let timerInterval;
+function startTimer() {
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (!sess.startTime) return;
+    const elapsed = Date.now() - sess.startTime;
+    const s = Math.floor(elapsed/1000);
+    const mm   = String(Math.floor(s/60)).padStart(2,'0');
+    const ss   = String(s%60).padStart(2,'0');
+    const time = `${mm}:${ss}`;
+    document.getElementById('sessionTimerMain').textContent = time;
+    document.getElementById('sessionTimerHeader').textContent = time;
+  }, 500);
+}
+startTimer();
+
+// ────────────────────────────────────────
+// SUMMARY
+// ────────────────────────────────────────
+function renderSummary() {
+  const reps    = sess.repHistory.length;
+  const sets    = cfg.mode === 'precision' ? `${sess.currentSet - (sess.repsThisSet === 0 ? 1 : 0)}/${cfg.totalSets}` : (sess.currentSet).toString();
+  const elapsed = sess.endTime - sess.startTime;
+  const mm = String(Math.floor(elapsed/60000)).padStart(2,'0');
+  const ss = String(Math.floor((elapsed%60000)/1000)).padStart(2,'0');
+  const tuts = sess.repHistory.map(r=>r.tut);
+  const totalTut = (sess.phaseAccum.CONCENTRIC + sess.phaseAccum.ECCENTRIC + sess.phaseAccum.TOP_PAUSE) / 1000;
+  const best  = tuts.length ? Math.max(...tuts) : 0;
+  const avg   = tuts.length ? tuts.reduce((a,b)=>a+b,0)/tuts.length : 0;
+
+  document.getElementById('summaryDate').textContent   = new Date().toLocaleString();
+  document.getElementById('sumReps').textContent       = reps;
+  document.getElementById('sumSets').textContent       = sets;
+  document.getElementById('sumDuration').textContent   = `${mm}:${ss}`;
+  document.getElementById('sumTut').innerHTML          = `${totalTut.toFixed(1)}<span class="s-unit">s</span>`;
+  document.getElementById('sumBest').innerHTML         = `${best.toFixed(2)}<span class="s-unit">s</span>`;
+  document.getElementById('sumAvg').innerHTML          = avg > 0 ? `${avg.toFixed(2)}<span class="s-unit">s</span>` : '—';
+
+  // Work card
+  if (cfg.weight > 0) {
+    const work = cfg.weight * totalTut;
+    const unit = cfg.weightUnit;
+    document.getElementById('workCard').style.display = 'block';
+    document.getElementById('sumWork').textContent = `${work.toFixed(0)} ${unit}·s`;
+  }
+
+  drawSummaryChart();
+}
+
+function drawSummaryChart() {
+  const canvas = document.getElementById('summaryTutChart');
+  if (!canvas || !sess.repHistory.length) return;
+  const dpr = window.devicePixelRatio||1;
+  canvas.width  = canvas.offsetWidth  * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W=canvas.offsetWidth, H=canvas.offsetHeight;
+  const pad={l:40,r:20,t:16,b:28};
+  const data = sess.repHistory;
+  const maxV = Math.max(...data.map(r=>r.tut)) * 1.2 || 10;
+  const targetV = cfg.targetTut || 0;
+
+  // Grid
+  ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+  for (let i=0;i<=4;i++) {
+    const y=pad.t+(1-i/4)*(H-pad.t-pad.b);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(W-pad.r,y); ctx.stroke();
+    ctx.fillStyle='#3a3a55'; ctx.font='10px Inter'; ctx.textAlign='right';
+    ctx.fillText((maxV*i/4).toFixed(1)+'s',pad.l-4,y+4);
+  }
+
+  // Target line
+  if (targetV > 0 && targetV < maxV) {
+    const ty=pad.t+(1-targetV/maxV)*(H-pad.t-pad.b);
+    ctx.strokeStyle='rgba(245,158,11,.5)'; ctx.lineWidth=1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l,ty); ctx.lineTo(W-pad.r,ty); ctx.stroke();
+    ctx.setLineDash([]); ctx.fillStyle='#f59e0b'; ctx.font='bold 9px Inter'; ctx.textAlign='left';
+    ctx.fillText('Target',pad.l+4,ty-4);
+  }
+
+  // Bars
+  const bw=Math.min(36,(W-pad.l-pad.r)/data.length*0.65);
+  const gap=(W-pad.l-pad.r-bw*data.length)/(data.length+1);
+  data.forEach((r,i) => {
+    const bh=(r.tut/maxV)*(H-pad.t-pad.b);
+    const bx=pad.l+gap+i*(bw+gap);
+    const by=H-pad.b-bh;
+    const over=targetV>0 && r.tut>=targetV;
+    const grad=ctx.createLinearGradient(0,by,0,H-pad.b);
+    if (over) { grad.addColorStop(0,'#36d399'); grad.addColorStop(1,'rgba(54,211,153,.2)'); }
+    else       { grad.addColorStop(0,'#6c63ff'); grad.addColorStop(1,'rgba(108,99,255,.2)'); }
+    ctx.fillStyle=grad;
+    ctx.beginPath();
+    if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,4); else ctx.rect(bx,by,bw,bh);
+    ctx.fill();
+    ctx.fillStyle='#3a3a55'; ctx.font='9px Inter'; ctx.textAlign='center';
+    ctx.fillText('R'+r.rep, bx+bw/2, H-pad.b+12);
+    if (data.length<=20) {
+      ctx.fillStyle=over?'#36d399':'#6c63ff'; ctx.font='bold 9px Inter';
+      ctx.fillText(r.tut.toFixed(1), bx+bw/2, by-5);
+    }
+  });
+}
+
+// ────────────────────────────────────────
+// EXPORT
+// ────────────────────────────────────────
+function exportSummary() {
+  const reps = sess.repHistory.length;
+  const totalTut = (sess.phaseAccum.CONCENTRIC + sess.phaseAccum.ECCENTRIC + sess.phaseAccum.TOP_PAUSE)/1000;
+  const tuts = sess.repHistory.map(r=>r.tut);
+  const avg = tuts.length ? (tuts.reduce((a,b)=>a+b,0)/tuts.length).toFixed(2) : '—';
+  let txt = `SmartTUT Workout Summary — ${new Date().toLocaleString()}\n`;
+  txt += `Mode: ${cfg.mode === 'precision' ? 'Precision' : 'Freestyle'}\n`;
+  if (cfg.mode==='precision') txt += `Sets: ${cfg.totalSets} × ${cfg.repsPerSet} reps @ ${cfg.targetTut}s TUT target\n`;
+  txt += `Total Reps: ${reps}\nTotal TUT: ${totalTut.toFixed(1)}s\nAvg TUT/rep: ${avg}s\n`;
+  if (cfg.weight>0) txt += `Weight: ${cfg.weight} ${cfg.weightUnit} | Total Work: ${(cfg.weight*totalTut).toFixed(0)} ${cfg.weightUnit}·s\n`;
+  txt += `\nRep log:\n`;
+  sess.repHistory.forEach(r => { txt += `  R${r.rep} (S${r.set}): ${r.tut.toFixed(2)}s\n`; });
+  navigator.clipboard.writeText(txt).then(()=>alert('Summary copied to clipboard!')).catch(()=>alert(txt));
+}
+
+// ────────────────────────────────────────
+// RESET
+// ────────────────────────────────────────
+function resetSession() {
+  clearInterval(timerInterval);
+  clearInterval(sess.restTimer);
+  Object.assign(sess, {
+    startTime:null, endTime:null, calibrated:false,
+    currentSet:1, repsThisSet:0, prevRepCount:0,
+    repHistory:[], phaseLog:[], chartData:[], repMarkers:[],
+    phaseAccum:{CONCENTRIC:0,ECCENTRIC:0,TOP_PAUSE:0,BOTTOM_PAUSE:0,MID_HOLD:0},
+    inRest:false, restTimer:null, lastPacket:null
+  });
+  document.getElementById('sessionBadge').classList.remove('show');
+  document.getElementById('calStatus').classList.remove('show');
+  document.getElementById('rest-overlay').classList.remove('show');
+  document.getElementById('repProgressBar').classList.remove('show');
+  document.getElementById('repList').innerHTML = '<div class="empty-state"><div class="empty-icon">💪</div><div class="empty-text">Complete a rep to see data</div></div>';
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('wRepCount').textContent='—';
+  document.getElementById('setIndicator').style.display='none';
+  startTimer();
+}
+
+// Start session UI when calibration detected
+const _origShowScreen = showScreen;
+function showScreen(id) {
+  _origShowScreen(id);
+  if (id === 'workout') startSessionUI();
+}
+
+window.addEventListener('resize', () => {
+  drawPositionChart();
+  if (document.getElementById('screen-summary')?.classList.contains('active')) drawSummaryChart();
+});
+</script>
+</body>
+</html>
