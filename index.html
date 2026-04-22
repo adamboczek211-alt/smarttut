@@ -778,9 +778,15 @@ const sess = {
 // SCREEN NAVIGATION
 // ────────────────────────────────────────
 function showScreen(id) {
-  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.remove('active');
+    s.style.display = 'none';
+  });
   const el = document.getElementById('screen-' + id);
-  if (el) { el.classList.add('active'); }
+  if (el) {
+    el.classList.add('active');
+    el.style.display = 'block';
+  }
 }
 
 function goHome() {
@@ -802,6 +808,9 @@ async function toggleConnect() {
     });
     bleDevice.addEventListener('gattserverdisconnected', onBleDisconnect);
     bleServer = await bleDevice.gatt.connect();
+    // Small delay to let GATT server stabilize (Web Bluetooth race condition fix)
+    await new Promise(r => setTimeout(r, 400));
+    if (!bleServer.connected) bleServer = await bleDevice.gatt.connect();
     const svc = await bleServer.getPrimaryService(SERVICE_UUID);
     dataChar  = await svc.getCharacteristic(CHAR_DATA_UUID);
     cmdChar   = await svc.getCharacteristic(CHAR_CMD_UUID);
