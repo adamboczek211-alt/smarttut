@@ -880,6 +880,9 @@ async function toggleConnect() {
     dataChar.addEventListener('characteristicvaluechanged', onBleData);
     connected = true;
     setBleState('connected');
+    // Sync time to device for OLED clock
+    const localSec = Math.floor(Date.now() / 1000) - new Date().getTimezoneOffset() * 60;
+    await sendCmd('T:' + localSec);
     showScreen('mode');
   } catch(e) {
     setBleState('disconnected');
@@ -955,18 +958,9 @@ function onBleData(e) {
       pt.startMs = Date.now();
       pt.vibrated = false;
     } else if (!pt.vibrated) {
-      const phaseTargets = {
-        BOTTOM_PAUSE: cfg.tempoBottom,
-        CONCENTRIC:   cfg.tempoCon,
-        TOP_PAUSE:    cfg.tempoTop,
-        ECCENTRIC:    cfg.tempoEcc
-      };
-      const target = phaseTargets[p.phaseName];
-      const elapsed = (Date.now() - pt.startMs) / 1000;
-      if (target > 0 && elapsed >= target) {
-        pt.vibrated = true;
-        sendCmd('v'); // haptic feedback
-      }
+      // Phase timing display only — firmware handles haptic guidance
+      // (removed sendCmd('v') — firmware now vibrates autonomously)
+      pt.vibrated = true; // prevent loop
     }
   }
 
@@ -1084,7 +1078,12 @@ function confirmSetup() {
   // ── Send config to firmware via BLE (saves to NVS for offline mode) ──
   if (connected && cmdChar) {
     const exCmd = cfg.exercise === 'squat' ? '2' : '1';
-    const cfgStr = `S:${cfg.totalSets}:${cfg.repsPerSet}:${cfg.restSeconds}`;
+    // Format: S:sets:reps:rest:tempoB:tempoC:tempoT:tempoE
+    const B = Math.round(cfg.tempoBottom);
+    const C = Math.round(cfg.tempoCon);
+    const T = Math.round(cfg.tempoTop);
+    const E = Math.round(cfg.tempoEcc);
+    const cfgStr = `S:${cfg.totalSets}:${cfg.repsPerSet}:${cfg.restSeconds}:${B}:${C}:${T}:${E}`;
     sendCmd(exCmd).then(() => sendCmd(cfgStr));
     console.log(`Sent to device: exercise=${exCmd}, config=${cfgStr}`);
   }
