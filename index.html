@@ -997,7 +997,7 @@ function onBleData(e) {
   sess.phaseLog = sess.phaseLog.filter(x => x.end > now - 60000);
 
   // New rep detection
-  if (p.repCount > sess.prevRepCount && p.lastTut > 0) {
+  if (p.repCount > sess.prevRepCount && p.lastTut > 0 && !sess.inRest) {
     for (let i = sess.prevRepCount + 1; i <= p.repCount; i++) {
       sess.repHistory.push({ rep: i, set: sess.currentSet, tut: p.lastTut, ts: now });
       sess.repMarkers.push({ ts: now, rep: i });
@@ -1005,13 +1005,15 @@ function onBleData(e) {
 
       if (cfg.mode === 'precision' && sess.repsThisSet >= cfg.repsPerSet) {
         if (sess.currentSet < cfg.totalSets) {
-          startRest();
+          startRest(); break;          // break → no more reps processed this packet
         } else {
-          setTimeout(endSession, 500);
+          setTimeout(endSession, 500); break;
         }
       }
     }
     sess.prevRepCount = p.repCount;
+  } else if (p.repCount > sess.prevRepCount) {
+    sess.prevRepCount = p.repCount;   // keep in sync even during rest
   }
 
   updateWorkoutUI(p);
@@ -1171,6 +1173,7 @@ function updateRepDots() {
 // REST TIMER
 // ────────────────────────────────────────
 function startRest() {
+  if (sess.inRest) return;  // guard — prevent multiple simultaneous timers
   sess.inRest = true;
   const nextSet = sess.currentSet + 1;
   document.getElementById('restSetInfo').textContent = `Rest before Set ${nextSet} of ${cfg.totalSets}`;
