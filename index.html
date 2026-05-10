@@ -958,9 +958,18 @@ function onBleData(e) {
       pt.startMs = Date.now();
       pt.vibrated = false;
     } else if (!pt.vibrated) {
-      // Phase timing display only — firmware handles haptic guidance
-      // (removed sendCmd('v') — firmware now vibrates autonomously)
-      pt.vibrated = true; // prevent loop
+      const phaseTargets = {
+        BOTTOM_PAUSE: cfg.tempoBottom,
+        CONCENTRIC:   cfg.tempoCon,
+        TOP_PAUSE:    cfg.tempoTop,
+        ECCENTRIC:    cfg.tempoEcc
+      };
+      const target = phaseTargets[p.phaseName];
+      const elapsed = (Date.now() - pt.startMs) / 1000;
+      if (target > 0 && elapsed >= target) {
+        pt.vibrated = true;
+        sendCmd('v'); // haptic feedback when phase target reached
+      }
     }
   }
 
