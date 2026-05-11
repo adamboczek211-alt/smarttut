@@ -387,6 +387,51 @@
     .empty-icon { font-size:32px;opacity:.3; }
     .empty-text { font-size:13px; }
 
+    /* Weight confirmation modal */
+    .wgt-modal-backdrop {
+      display:none;position:fixed;inset:0;z-index:900;
+      background:rgba(7,7,13,.85);backdrop-filter:blur(8px);
+      align-items:center;justify-content:center;
+    }
+    .wgt-modal-backdrop.show { display:flex; }
+    .wgt-modal {
+      background:var(--surface);border:1px solid var(--border);border-radius:18px;
+      padding:32px;max-width:380px;width:90%;text-align:center;
+      animation:fadeIn .2s ease;
+    }
+    .wgt-modal-icon { font-size:44px;margin-bottom:14px; }
+    .wgt-modal-title { font-size:20px;font-weight:800;margin-bottom:10px; }
+    .wgt-modal-msg { font-size:14px;color:var(--text-muted);line-height:1.6;margin-bottom:24px; }
+    .wgt-modal-btns { display:flex;gap:12px;justify-content:center; }
+
+    /* History, chart legend (already added) */
+    .history-empty { text-align:center;padding:24px;color:var(--text-muted);font-size:13px; }
+    .history-item {
+      display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;
+      padding:14px 16px;background:var(--surface2);border-radius:10px;border-left:3px solid var(--border);
+      margin-bottom:8px;transition:border-color .2s;
+    }
+    .history-item:hover { border-left-color:var(--accent); }
+    .history-item.best  { border-left-color:var(--accent3); }
+    .history-date { font-size:11px;color:var(--text-muted);margin-bottom:4px; }
+    .history-exercise { font-size:13px;font-weight:700;margin-bottom:6px; }
+    .history-stats { display:flex;flex-wrap:wrap;gap:10px; }
+    .history-stat { font-size:12px;color:var(--text-muted); }
+    .history-stat strong { color:var(--text); }
+    .history-tut { font-size:20px;font-weight:800;letter-spacing:-1px;color:var(--accent3);text-align:right; }
+    .history-tut-label { font-size:10px;color:var(--text-muted);text-align:right; }
+    .history-progress {
+      margin-top:10px;padding:10px 14px;border-radius:8px;
+      background:rgba(54,211,153,.06);border:1px solid rgba(54,211,153,.15);
+      font-size:12px;color:var(--text-muted);display:flex;gap:16px;flex-wrap:wrap;
+    }
+    .prog-up   { color:var(--accent3); font-weight:700; }
+    .prog-down { color:var(--accent2); font-weight:700; }
+    .prog-same { color:var(--text-muted); font-weight:600; }
+    /* Chart legend */
+    .chart-legend { display:flex;gap:16px;align-items:center;margin-top:8px;font-size:11px;color:var(--text-muted); }
+    .legend-dot { width:10px;height:10px;border-radius:2px;flex-shrink:0; }
+
     @media (max-width:900px) {
       header { padding:0 16px; }
       .screen { padding:20px 16px; }
@@ -532,13 +577,13 @@
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">Rest Between Sets (s)</label>
-        <input class="form-input" id="setupRest" type="number" value="60" min="10" max="300" placeholder="60">
+        <input class="form-input" id="setupRest" type="number" value="30" min="10" max="300" placeholder="30">
       </div>
     </div>
     <div class="form-row">
       <div class="form-group">
-        <label class="form-label">Weight</label>
-        <input class="form-input" id="setupWeight" type="number" value="0" min="0" max="200" placeholder="0">
+        <label class="form-label">Weight <span id="weightLimitHint" style="font-weight:400;color:var(--text-dim);font-size:10px;">(max 100kg / 220lbs)</span></label>
+        <input class="form-input" id="setupWeight" type="number" value="0" min="0" max="9999" placeholder="0">
       </div>
       <div class="form-group">
         <label class="form-label">Unit</label>
@@ -552,26 +597,26 @@
       <div class="form-label" style="margin-bottom:10px;">TUT Tempo (seconds per phase)</div>
       <div style="display:flex;align-items:center;gap:8px;">
         <div style="text-align:center;flex:1;">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--bottom-pause);margin-bottom:5px;">⬇ Bottom</div>
+          <div id="tempoLabelBottom" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--bottom-pause);margin-bottom:5px;">⬇ Bottom</div>
           <input class="form-input" id="tempoBottom" type="number" value="1" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
         </div>
         <div style="font-size:24px;font-weight:900;color:var(--text-dim);margin-top:16px;">-</div>
         <div style="text-align:center;flex:1;">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--concentric);margin-bottom:5px;">⬆ Con</div>
-          <input class="form-input" id="tempoCon" type="number" value="2" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
+          <div id="tempoLabelCon" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--concentric);margin-bottom:5px;">⬆ Con</div>
+          <input class="form-input" id="tempoCon" type="number" value="1" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
         </div>
         <div style="font-size:24px;font-weight:900;color:var(--text-dim);margin-top:16px;">-</div>
         <div style="text-align:center;flex:1;">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--top-pause);margin-bottom:5px;">⬆ Top</div>
+          <div id="tempoLabelTop" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--top-pause);margin-bottom:5px;">⬆ Top</div>
           <input class="form-input" id="tempoTop" type="number" value="1" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
         </div>
         <div style="font-size:24px;font-weight:900;color:var(--text-dim);margin-top:16px;">-</div>
         <div style="text-align:center;flex:1;">
-          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--eccentric);margin-bottom:5px;">⬇ Ecc</div>
-          <input class="form-input" id="tempoEcc" type="number" value="3" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
+          <div id="tempoLabelEcc" style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--eccentric);margin-bottom:5px;">⬇ Ecc</div>
+          <input class="form-input" id="tempoEcc" type="number" value="1" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
         </div>
       </div>
-      <div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text-muted);">Total: <strong id="tempoTotal" style="color:var(--text);">7s</strong> / rep &nbsp;·&nbsp; Motor vibrates when each phase timer ends</div>
+      <div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text-muted);">Total: <strong id="tempoTotal" style="color:var(--text);">4s</strong> / rep &nbsp;·&nbsp; Motor vibrates when each phase timer ends</div>
     </div>
     <div style="display:flex;gap:12px;margin-top:8px;">
       <button class="btn btn-secondary" style="flex:1;" onclick="showScreen('mode')">← Back</button>
@@ -778,8 +823,12 @@
   </div>
 
   <div class="summary-breakdown card" style="margin-bottom:16px;">
-    <div class="card-title">TUT Breakdown</div>
+    <div class="card-title">TUT Breakdown per Rep</div>
     <canvas id="summaryTutChart"></canvas>
+    <div class="chart-legend">
+      <div class="legend-dot" style="background:#36d399;"></div><span>Tempo spełnione ✓</span>
+      <div class="legend-dot" style="background:#3b82f6;"></div><span>Poniżej tempa / za szybko</span>
+    </div>
   </div>
 
   <div class="card" id="workCard" style="margin-bottom:20px;display:none;">
@@ -792,12 +841,61 @@
     <button class="btn btn-secondary" onclick="goHome()">← New Session</button>
     <button class="btn btn-primary" onclick="exportSummary()">📋 Copy Summary</button>
   </div>
+
+  <!-- Historia sesji -->
+  <div class="card" id="historyCard" style="margin-top:24px;margin-bottom:20px;">
+    <div class="card-title" style="margin-bottom:14px;">📊 Historia Sesji</div>
+    <div id="historyContent"><div class="history-empty">Brak historii — ukończyj pierwszą sesję.</div></div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════
      JAVASCRIPT
 ═══════════════════════════════════════ -->
+<!-- Weight confirmation modal -->
+<div class="wgt-modal-backdrop" id="wgtModal">
+  <div class="wgt-modal">
+    <div class="wgt-modal-icon" id="wgtModalIcon">⚠️</div>
+    <div class="wgt-modal-title">Are you sure?</div>
+    <div class="wgt-modal-msg" id="wgtModalMsg">That's a very heavy weight!</div>
+    <div class="wgt-modal-btns">
+      <button class="btn btn-secondary btn-sm" onclick="resolveWeightModal(false)">No, go back</button>
+      <button class="btn btn-danger btn-sm" onclick="resolveWeightModal(true)">Yes, I'm sure</button>
+    </div>
+  </div>
+</div>
+
 <script>
+// ────────────────────────────────────────
+// WEIGHT CONFIRMATION MODAL
+// ────────────────────────────────────────
+// Limits: bicep 100kg (220 lbs), squat 300kg (661 lbs)
+const WEIGHT_LIMITS_KG  = { bicep: 100, squat: 300 };
+const KG_TO_LBS = 2.20462;
+
+let _weightModalResolve = null;
+
+function showWeightConfirm(weight, unit, exercise) {
+  return new Promise(resolve => {
+    _weightModalResolve = resolve;
+    const limitKg  = WEIGHT_LIMITS_KG[exercise] || 100;
+    const limitLbs = Math.round(limitKg * KG_TO_LBS);
+    const exName   = exercise === 'bicep' ? 'bicep curl' : 'squat';
+    document.getElementById('wgtModalIcon').textContent = exercise === 'bicep' ? '💪⚠️' : '🏋️⚠️';
+    document.getElementById('wgtModalMsg').innerHTML =
+      `You entered <strong>${weight} ${unit}</strong> for a ${exName}.<br><br>` +
+      `The recommended maximum is <strong>${unit==='kg' ? limitKg+'kg' : limitLbs+'lbs'}</strong>. ` +
+      `Proceeding with a weight this heavy may cause injury.<br><br>` +
+      `Are you absolutely sure?`;
+    document.getElementById('wgtModal').classList.add('show');
+  });
+}
+
+function resolveWeightModal(confirmed) {
+  document.getElementById('wgtModal').classList.remove('show');
+  if (_weightModalResolve) { _weightModalResolve(confirmed); _weightModalResolve = null; }
+}
+
 // ────────────────────────────────────────
 // BLE CONFIG
 // ────────────────────────────────────────
@@ -1033,7 +1131,12 @@ const EXERCISE_CONFIG = {
     step1Desc: 'Let arm hang fully extended at your side → press BOTTOM',
     step2Title: 'Arm up — TOP position',
     step2Desc: 'Curl arm fully to shoulder → press TOP',
-    modeLabel: 'BICEP CURL'
+    modeLabel: 'BICEP CURL',
+    // Tempo phase labels — bicep starts at bottom, curls up
+    tempoLabelBottom: '⬇ Bottom',   // arm hanging down (pause before rep)
+    tempoLabelCon:    '⬆ Curl up',  // concentric = lifting the weight
+    tempoLabelTop:    '⬆ Top',      // peak pause at shoulder
+    tempoLabelEcc:    '⬇ Lower',    // eccentric = lowering the weight
   },
   squat: {
     title: 'Squat Setup',
@@ -1045,7 +1148,13 @@ const EXERCISE_CONFIG = {
     step1Desc: 'Stand fully upright with wristband on arm → press BOTTOM',
     step2Title: 'Full squat down — TOP position',
     step2Desc: 'Lower into full squat position → press TOP',
-    modeLabel: 'SQUAT'
+    modeLabel: 'SQUAT',
+    // Tempo phase labels — squat starts standing, descends, returns
+    // NOTE: firmware maps BOTTOM=standing, TOP=squat bottom (per calibration step order)
+    tempoLabelBottom: '⬆ Stand',    // standing pause (between reps)
+    tempoLabelCon:    '⬇ Descent',  // going down into squat
+    tempoLabelTop:    '⬇ Low hold', // pause at lowest squat position
+    tempoLabelEcc:    '⬆ Ascent',   // driving back up
   }
 };
 
@@ -1055,6 +1164,15 @@ function selectExercise(exercise) {
   const ec = EXERCISE_CONFIG[exercise];
   document.getElementById('setupTitle').textContent = ec.title;
   document.getElementById('setupSub').textContent   = ec.sub;
+  // Update tempo phase labels for this exercise
+  document.getElementById('tempoLabelBottom').textContent = ec.tempoLabelBottom;
+  document.getElementById('tempoLabelCon').textContent    = ec.tempoLabelCon;
+  document.getElementById('tempoLabelTop').textContent    = ec.tempoLabelTop;
+  document.getElementById('tempoLabelEcc').textContent    = ec.tempoLabelEcc;
+  // Update weight limit hint
+  const limitKg  = WEIGHT_LIMITS_KG[exercise] || 100;
+  const limitLbs = Math.round(limitKg * KG_TO_LBS);
+  document.getElementById('weightLimitHint').textContent = `(max ${limitKg}kg / ${limitLbs}lbs)`;
   showScreen('setup');
 }
 
@@ -1075,16 +1193,26 @@ function setUnit(unit) {
   document.getElementById('unitKg').classList.toggle('active',  unit === 'kg');
 }
 
-function confirmSetup() {
+async function confirmSetup() {
   cfg.totalSets  = parseInt(document.getElementById('setupSets').value)  || 3;
   cfg.repsPerSet = parseInt(document.getElementById('setupReps').value)   || 10;
-  cfg.restSeconds= parseInt(document.getElementById('setupRest').value)   || 60;
+  cfg.restSeconds= parseInt(document.getElementById('setupRest').value)   || 30;
   cfg.weight     = parseFloat(document.getElementById('setupWeight').value)|| 0;
   cfg.tempoBottom= parseFloat(document.getElementById('tempoBottom').value)|| 0;
   cfg.tempoCon   = parseFloat(document.getElementById('tempoCon').value)   || 0;
   cfg.tempoTop   = parseFloat(document.getElementById('tempoTop').value)   || 0;
   cfg.tempoEcc   = parseFloat(document.getElementById('tempoEcc').value)   || 0;
   cfg.targetTut  = cfg.tempoBottom + cfg.tempoCon + cfg.tempoTop + cfg.tempoEcc || 4;
+
+  // ── Weight safety check ──────────────────────────────────
+  if (cfg.weight > 0) {
+    const weightKg = cfg.weightUnit === 'kg' ? cfg.weight : cfg.weight / KG_TO_LBS;
+    const limitKg  = WEIGHT_LIMITS_KG[cfg.exercise] || 100;
+    if (weightKg >= limitKg) {
+      const confirmed = await showWeightConfirm(cfg.weight, cfg.weightUnit, cfg.exercise);
+      if (!confirmed) return;  // user clicked "No, go back"
+    }
+  }
 
   // ── Send config to firmware via BLE (saves to NVS for offline mode) ──
   if (connected && cmdChar) {
@@ -1100,6 +1228,9 @@ function confirmSetup() {
   }
 
   updateCalibrateLabels();
+  // Reset calibration transition detector so that pressing b+t always triggers session start,
+  // even if the firmware was already calibrated when the website connected.
+  sess.prevCalibrated = null;
   showScreen('calibrate');
 }
 
@@ -1234,6 +1365,7 @@ function endSession() {
   sess.endTime = Date.now();
   document.getElementById('sessionBadge').classList.remove('show');
   clearInterval(timerInterval);
+  saveToHistory();
   showScreen('summary');
   renderSummary();
 }
@@ -1492,6 +1624,7 @@ function renderSummary() {
   }
 
   drawSummaryChart();
+  renderHistory();
 }
 
 function drawSummaryChart() {
@@ -1536,7 +1669,7 @@ function drawSummaryChart() {
     const over=targetV>0 && r.tut>=targetV;
     const grad=ctx.createLinearGradient(0,by,0,H-pad.b);
     if (over) { grad.addColorStop(0,'#36d399'); grad.addColorStop(1,'rgba(54,211,153,.2)'); }
-    else       { grad.addColorStop(0,'#6c63ff'); grad.addColorStop(1,'rgba(108,99,255,.2)'); }
+    else       { grad.addColorStop(0,'#3b82f6'); grad.addColorStop(1,'rgba(59,130,246,.2)'); }
     ctx.fillStyle=grad;
     ctx.beginPath();
     if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,4); else ctx.rect(bx,by,bw,bh);
@@ -1544,10 +1677,109 @@ function drawSummaryChart() {
     ctx.fillStyle='#3a3a55'; ctx.font='9px Inter'; ctx.textAlign='center';
     ctx.fillText('R'+r.rep, bx+bw/2, H-pad.b+12);
     if (data.length<=20) {
-      ctx.fillStyle=over?'#36d399':'#6c63ff'; ctx.font='bold 9px Inter';
+      ctx.fillStyle=over?'#36d399':'#3b82f6'; ctx.font='bold 9px Inter';
       ctx.fillText(r.tut.toFixed(1), bx+bw/2, by-5);
     }
   });
+}
+
+// ────────────────────────────────────────
+// SESSION HISTORY (localStorage)
+// ────────────────────────────────────────
+const HISTORY_KEY = 'smarttut_history';
+
+function saveToHistory() {
+  const reps = sess.repHistory.length;
+  if (reps === 0) return;
+  const tuts = sess.repHistory.map(r => r.tut);
+  const totalTut = (sess.phaseAccum.CONCENTRIC + sess.phaseAccum.ECCENTRIC + sess.phaseAccum.TOP_PAUSE) / 1000;
+  const record = {
+    date:       new Date().toISOString(),
+    exercise:   cfg.exercise,
+    sets:       cfg.totalSets,
+    repsPerSet: cfg.repsPerSet,
+    weight:     cfg.weight,
+    weightUnit: cfg.weightUnit,
+    totalReps:  reps,
+    totalTut:   parseFloat(totalTut.toFixed(2)),
+    avgTut:     parseFloat((tuts.reduce((a,b)=>a+b,0)/tuts.length).toFixed(2)),
+    bestTut:    parseFloat(Math.max(...tuts).toFixed(2)),
+    duration:   sess.endTime - sess.startTime
+  };
+  try {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    history.unshift(record);
+    if (history.length > 30) history.length = 30;
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+  } catch(e) { console.error('History save failed:', e); }
+}
+
+function renderHistory() {
+  const el = document.getElementById('historyContent');
+  if (!el) return;
+  let history = [];
+  try { history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
+  catch(e) { history = []; }
+
+  if (!history.length) {
+    el.innerHTML = '<div class="history-empty">Brak historii — ukończyj pierwszą sesję.</div>';
+    return;
+  }
+
+  const exIcon = { bicep: '💪', squat: '🏋️' };
+  const exName = { bicep: 'Bicep Curl', squat: 'Squat' };
+
+  // Progress comparison: current session vs. earlier session (up to 5 back)
+  const current = history[0];
+  const compareIdx = Math.min(5, history.length - 1);
+  const older = compareIdx > 0 ? history[compareIdx] : null;
+
+  let progressHTML = '';
+  if (older && older.exercise === current.exercise) {
+    const repDiff  = current.totalReps - older.totalReps;
+    const tutDiff  = parseFloat((current.avgTut - older.avgTut).toFixed(2));
+    const wgtDiff  = current.weight > 0 && older.weight > 0
+      ? parseFloat((current.weight - older.weight).toFixed(1)) : null;
+
+    const fmt = (val, unit) => {
+      if (val > 0) return `<span class="prog-up">+${val}${unit}</span>`;
+      if (val < 0) return `<span class="prog-down">${val}${unit}</span>`;
+      return `<span class="prog-same">=${val}${unit}</span>`;
+    };
+    progressHTML = `<div class="history-progress">
+      <span>vs. ${compareIdx} sesji temu:</span>
+      ${fmt(repDiff,' reps')}
+      ${fmt(tutDiff,'s avg TUT')}
+      ${wgtDiff !== null ? fmt(wgtDiff,' '+current.weightUnit) : ''}
+    </div>`;
+  }
+
+  const rows = history.slice(0, 10).map((s, i) => {
+    const d   = new Date(s.date);
+    const dateStr = d.toLocaleDateString('pl-PL', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const timeStr = d.toLocaleTimeString('pl-PL', { hour:'2-digit', minute:'2-digit' });
+    const dur = s.duration ? ` · ${Math.floor(s.duration/60000)}min` : '';
+    const wgt = s.weight > 0 ? `<strong>${s.weight}${s.weightUnit}</strong>` : '—';
+    const isLatest = i === 0 ? ' best' : '';
+    return `<div class="history-item${isLatest}">
+      <div>
+        <div class="history-date">${dateStr} ${timeStr}${dur}</div>
+        <div class="history-exercise">${exIcon[s.exercise]||'🏃'} ${exName[s.exercise]||s.exercise}</div>
+        <div class="history-stats">
+          <div class="history-stat">${s.sets}&times;${s.repsPerSet} reps</div>
+          <div class="history-stat">Łącznie: <strong>${s.totalReps} reps</strong></div>
+          <div class="history-stat">Ciężar: ${wgt}</div>
+          <div class="history-stat">Best TUT: <strong>${s.bestTut}s</strong></div>
+        </div>
+      </div>
+      <div>
+        <div class="history-tut">${s.avgTut}s</div>
+        <div class="history-tut-label">avg TUT</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = progressHTML + rows;
 }
 
 // ────────────────────────────────────────
