@@ -1120,17 +1120,16 @@ function onBleData(e) {
     sess.prevRepCount = p.repCount;   // keep in sync even during rest
   }
 
-  // BLE → rest sync: device sends exact seconds remaining every 100ms
-  // Sync immediately when first isResting packet arrives (handles initial desync)
-  // Then keep syncing every packet to correct any drift
+  // BLE → rest sync
   if (p.isResting && p.restSecsLeft > 0) {
-    if (!sess.inRest) {
-      // Device is resting but website hasn't started rest overlay yet — start it now
+    // Guard: don't re-trigger startRest within 3s of a skipRest (prevents double-count)
+    const timeSinceSkip = sess.lastSkipTime ? Date.now() - sess.lastSkipTime : 9999;
+    if (!sess.inRest && sess.currentSet < cfg.totalSets && timeSinceSkip > 3000) {
       startRest();
     }
-    syncRestCountdown(p.restSecsLeft);
+    if (sess.inRest) syncRestCountdown(p.restSecsLeft);
   }
-  // Device finished resting — close overlay if still open (grace period: 3s)
+  // Device finished resting → close overlay (grace period 3s)
   const restAge = sess.restStartTime ? Date.now() - sess.restStartTime : 0;
   if (!p.isResting && sess.inRest && restAge > 3000) {
     skipRest();
@@ -1224,7 +1223,8 @@ async function confirmSetup() {
   cfg.tempoCon   = parseFloat(document.getElementById('tempoCon').value)   || 0;
   cfg.tempoTop   = parseFloat(document.getElementById('tempoTop').value)   || 0;
   cfg.tempoEcc   = parseFloat(document.getElementById('tempoEcc').value)   || 0;
-  cfg.targetTut  = cfg.tempoBottom + cfg.tempoCon + cfg.tempoTop + cfg.tempoEcc || 4;
+  // targetTut = active phases only (firmware measures CON + TOP + ECC, not BOTTOM_PAUSE)
+  cfg.targetTut  = cfg.tempoCon + cfg.tempoTop + cfg.tempoEcc || 3;
 
   // ── Weight safety check ──────────────────────────────────
   if (cfg.weight > 0) {
@@ -1361,7 +1361,8 @@ function syncRestCountdown(deviceSecsLeft) {
 function skipRest() {
   clearInterval(sess.restTimer);
   document.getElementById('rest-overlay').classList.remove('show');
-  sess.currentSet++;
+  sess.lastSkipTime = Date.now();
+  if (sess.currentSet < cfg.totalSets) sess.currentSet++;  // cap at totalSets
   sess.repsThisSet = 0;  // reset per-set counter only
   sess.inRest = false;
   // NOTE: prevRepCount is NOT reset — firmware continues counting globally.
@@ -1869,7 +1870,7 @@ function resetSession() {
     currentSet:1, repsThisSet:0, prevRepCount:0,
     repHistory:[], phaseLog:[], chartData:[], repMarkers:[],
     phaseAccum:{CONCENTRIC:0,ECCENTRIC:0,TOP_PAUSE:0,BOTTOM_PAUSE:0,MID_HOLD:0},
-    inRest:false, restTimer:null, restRemaining:0, restStartTime:0, lastPacket:null,
+    inRest:false, restTimer:null, restRemaining:0, restStartTime:0, lastSkipTime:0, lastPacket:null,
     phaseTimer: { phase: null, startMs: null, vibrated: false }
   });
   document.getElementById('sessionBadge').classList.remove('show');
