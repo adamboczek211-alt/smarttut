@@ -826,11 +826,11 @@
     <div class="card-title">TUT Breakdown per Rep</div>
     <canvas id="summaryTutChart"></canvas>
     <div class="chart-legend">
-      <div class="legend-dot" style="background:#36d399;"></div><span>Tempo spełnione ✓</span>
-      <div class="legend-dot" style="background:#3b82f6;"></div><span>Poniżej tempa / za szybko</span>
+      <div class="legend-dot" style="background:#36d399;"></div><span>Tempo met ✓</span>
+      <div class="legend-dot" style="background:#8b5cf6;"></div><span>Below target / too fast</span>
       <div style="display:flex;align-items:center;gap:4px;">
         <svg width="18" height="10"><line x1="0" y1="5" x2="18" y2="5" stroke="rgba(255,255,255,.75)" stroke-width="1.5" stroke-dasharray="5,3"/></svg>
-        <span>Średnia TUT</span>
+        <span>Average TUT</span>
       </div>
     </div>
   </div>
@@ -848,8 +848,8 @@
 
   <!-- Historia sesji -->
   <div class="card" id="historyCard" style="margin-top:24px;margin-bottom:20px;">
-    <div class="card-title" style="margin-bottom:14px;">📊 Historia Sesji</div>
-    <div id="historyContent"><div class="history-empty">Brak historii — ukończyj pierwszą sesję.</div></div>
+    <div class="card-title" style="margin-bottom:14px;">📊 Session History</div>
+    <div id="historyContent"><div class="history-empty">No history yet — complete your first session.</div></div>
   </div>
 </div>
 
@@ -1108,11 +1108,11 @@ function onBleData(e) {
       sess.repsThisSet++;
 
       if (cfg.mode === 'precision' && sess.repsThisSet >= cfg.repsPerSet) {
-        if (sess.currentSet < cfg.totalSets) {
-          startRest(); break;          // break → no more reps processed this packet
-        } else {
+        if (sess.currentSet >= cfg.totalSets) {
           setTimeout(endSession, 500); break;
         }
+        // REST is started by BLE isResting flag — no startRest() here to avoid race condition
+        break;
       }
     }
     sess.prevRepCount = p.repCount;
@@ -1120,13 +1120,17 @@ function onBleData(e) {
     sess.prevRepCount = p.repCount;   // keep in sync even during rest
   }
 
-  // BLE → rest sync: if device says it's resting, sync website countdown to device
-  if (p.isResting && sess.inRest && p.restSecsLeft > 0) {
+  // BLE → rest sync: device sends exact seconds remaining every 100ms
+  // Sync immediately when first isResting packet arrives (handles initial desync)
+  // Then keep syncing every packet to correct any drift
+  if (p.isResting && p.restSecsLeft > 0) {
+    if (!sess.inRest) {
+      // Device is resting but website hasn't started rest overlay yet — start it now
+      startRest();
+    }
     syncRestCountdown(p.restSecsLeft);
   }
-  // Device stopped resting but website still showing rest overlay → force close
-  // Grace period of 3s: prevents immediate skip when startRest() was just called
-  // but the BLE packet isResting flag hasn't flipped yet
+  // Device finished resting — close overlay if still open (grace period: 3s)
   const restAge = sess.restStartTime ? Date.now() - sess.restStartTime : 0;
   if (!p.isResting && sess.inRest && restAge > 3000) {
     skipRest();
@@ -1346,15 +1350,12 @@ function startRest() {
   }, 1000);
 }
 
-// Called every BLE packet during rest — corrects countdown drift against device clock
+// Called every BLE packet during rest — device clock is authoritative, always sync
 function syncRestCountdown(deviceSecsLeft) {
   if (!sess.inRest) return;
-  // Only correct if the difference is >= 1s to avoid jitter from round-trip
-  if (Math.abs(sess.restRemaining - deviceSecsLeft) >= 1) {
-    sess.restRemaining = deviceSecsLeft;
-    document.getElementById('restSeconds').textContent = sess.restRemaining;
-    drawRestArc(sess.restRemaining / cfg.restSeconds);
-  }
+  sess.restRemaining = deviceSecsLeft;
+  document.getElementById('restSeconds').textContent = sess.restRemaining;
+  drawRestArc(sess.restRemaining / cfg.restSeconds);
 }
 
 function skipRest() {
@@ -1702,7 +1703,7 @@ function drawSummaryChart() {
     const over=targetV>0 && r.tut>=targetV;
     const grad=ctx.createLinearGradient(0,by,0,H-pad.b);
     if (over) { grad.addColorStop(0,'#36d399'); grad.addColorStop(1,'rgba(54,211,153,.2)'); }
-    else       { grad.addColorStop(0,'#3b82f6'); grad.addColorStop(1,'rgba(59,130,246,.2)'); }
+    else       { grad.addColorStop(0,'#8b5cf6'); grad.addColorStop(1,'rgba(139,92,246,.2)'); }
     ctx.fillStyle=grad;
     ctx.beginPath();
     if(ctx.roundRect) ctx.roundRect(bx,by,bw,bh,4); else ctx.rect(bx,by,bw,bh);
@@ -1710,7 +1711,7 @@ function drawSummaryChart() {
     ctx.fillStyle='#3a3a55'; ctx.font='9px Inter'; ctx.textAlign='center';
     ctx.fillText('R'+r.rep, bx+bw/2, H-pad.b+12);
     if (data.length<=20) {
-      ctx.fillStyle=over?'#36d399':'#3b82f6'; ctx.font='bold 9px Inter';
+      ctx.fillStyle=over?'#36d399':'#8b5cf6'; ctx.font='bold 9px Inter';
       ctx.fillText(r.tut.toFixed(1), bx+bw/2, by-5);
     }
   });
@@ -1776,7 +1777,7 @@ function renderHistory() {
   catch(e) { history = []; }
 
   if (!history.length) {
-    el.innerHTML = '<div class="history-empty">Brak historii — ukończyj pierwszą sesję.</div>';
+    el.innerHTML = '<div class="history-empty">No history yet — complete your first session.</div>';
     return;
   }
 
@@ -1801,7 +1802,7 @@ function renderHistory() {
       return `<span class="prog-same">=${val}${unit}</span>`;
     };
     progressHTML = `<div class="history-progress">
-      <span>vs. ${compareIdx} sesji temu:</span>
+      <span>vs. ${compareIdx} session${compareIdx>1?'s':''} ago:</span>
       ${fmt(repDiff,' reps')}
       ${fmt(tutDiff,'s avg TUT')}
       ${wgtDiff !== null ? fmt(wgtDiff,' '+current.weightUnit) : ''}
@@ -1821,8 +1822,8 @@ function renderHistory() {
         <div class="history-exercise">${exIcon[s.exercise]||'🏃'} ${exName[s.exercise]||s.exercise}</div>
         <div class="history-stats">
           <div class="history-stat">${s.sets}&times;${s.repsPerSet} reps</div>
-          <div class="history-stat">Łącznie: <strong>${s.totalReps} reps</strong></div>
-          <div class="history-stat">Ciężar: ${wgt}</div>
+          <div class="history-stat">Total: <strong>${s.totalReps} reps</strong></div>
+          <div class="history-stat">Weight: ${wgt}</div>
           <div class="history-stat">Best TUT: <strong>${s.bestTut}s</strong></div>
         </div>
       </div>
