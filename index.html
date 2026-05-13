@@ -616,7 +616,7 @@
           <input class="form-input" id="tempoEcc" type="number" value="1" min="0" max="10" step="0.5" style="text-align:center;padding:10px 6px;">
         </div>
       </div>
-      <div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text-muted);">Total: <strong id="tempoTotal" style="color:var(--text);">4s</strong> / rep &nbsp;·&nbsp; Motor vibrates when each phase timer ends</div>
+      <div style="text-align:center;margin-top:10px;font-size:12px;color:var(--text-muted);">Full tempo: <strong id="tempoTotal" style="color:var(--text);">4s</strong> / rep &nbsp;·&nbsp; Active TUT target (excl. bottom pause): <strong id="tempoActiveTarget" style="color:var(--accent);">3s</strong> &nbsp;·&nbsp; Motor vibrates when each phase timer ends</div>
     </div>
     <div style="display:flex;gap:12px;margin-top:8px;">
       <button class="btn btn-secondary" style="flex:1;" onclick="showScreen('mode')">← Back</button>
@@ -1291,6 +1291,12 @@ function startSessionUI() {
       .reduce((s,i) => s + (parseFloat(document.getElementById(i)?.value)||0), 0);
     const el = document.getElementById('tempoTotal');
     if (el) el.textContent = t.toFixed(1) + 's';
+    // Update active TUT target (excl. bottom pause)
+    const c2 = parseFloat(document.getElementById('tempoCon')?.value)||0;
+    const t2 = parseFloat(document.getElementById('tempoTop')?.value)||0;
+    const e2 = parseFloat(document.getElementById('tempoEcc')?.value)||0;
+    const elA = document.getElementById('tempoActiveTarget');
+    if (elA) elA.textContent = (c2+t2+e2).toFixed(1) + 's';
   });
 });
 
@@ -1844,7 +1850,8 @@ function exportSummary() {
   const ec = EXERCISE_CONFIG[cfg.exercise] || EXERCISE_CONFIG.bicep;
   let txt = `SmartTUT Workout Summary — ${new Date().toLocaleString()}\n`;
   txt += `Exercise: ${ec.modeLabel}\n`;
-  txt += `Sets: ${cfg.totalSets} × ${cfg.repsPerSet} reps @ ${cfg.targetTut}s TUT target\n`;
+  const fullTempo = cfg.tempoBottom + cfg.tempoCon + cfg.tempoTop + cfg.tempoEcc;
+  txt += `Sets: ${cfg.totalSets} × ${cfg.repsPerSet} reps @ ${cfg.targetTut}s active TUT target (${fullTempo}s full tempo incl. bottom pause)\n`;
   txt += `Tempo: ${cfg.tempoBottom}-${cfg.tempoCon}-${cfg.tempoTop}-${cfg.tempoEcc}\n`;
   txt += `Total Reps: ${reps}\nTotal TUT: ${totalTut.toFixed(1)}s\nAvg TUT/rep: ${avg}s\n`;
   if (cfg.weight>0) txt += `Weight: ${cfg.weight} ${cfg.weightUnit} | Total Volume: ${(cfg.weight*reps).toFixed(0)} ${cfg.weightUnit}\n`;
