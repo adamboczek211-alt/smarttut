@@ -1154,10 +1154,10 @@ const EXERCISE_CONFIG = {
     step2Desc: 'Curl arm fully to shoulder → press TOP',
     modeLabel: 'BICEP CURL',
     // Tempo phase labels — bicep starts at bottom, curls up
-    tempoLabelBottom: '⬇ Bottom',   // arm hanging down (pause before rep)
-    tempoLabelCon:    '⬆ Curl up',  // concentric = lifting the weight
-    tempoLabelTop:    '⬆ Top',      // peak pause at shoulder
-    tempoLabelEcc:    '⬇ Lower',    // eccentric = lowering the weight
+    tempoLabelBottom: '⬇ Bottom Pause',      // arm hanging down — start of rep
+    tempoLabelCon:    '⬆ Concentric Lift',    // lifting the weight up
+    tempoLabelTop:    '⏸ Top Pause',          // peak pause at shoulder
+    tempoLabelEcc:    '⬇ Eccentric Lowering', // lowering the weight back down
   },
   squat: {
     title: 'Squat Setup',
@@ -1172,10 +1172,10 @@ const EXERCISE_CONFIG = {
     modeLabel: 'SQUAT',
     // Tempo phase labels — squat starts standing, descends, returns
     // NOTE: firmware maps BOTTOM=standing, TOP=squat bottom (per calibration step order)
-    tempoLabelBottom: '⬆ Stand',    // standing pause (between reps)
-    tempoLabelCon:    '⬇ Descent',  // going down into squat
-    tempoLabelTop:    '⬇ Low hold', // pause at lowest squat position
-    tempoLabelEcc:    '⬆ Ascent',   // driving back up
+    tempoLabelBottom: '⏸ Top Pause',          // standing at top — start of rep
+    tempoLabelCon:    '⬇ Eccentric Descent',  // going down into squat
+    tempoLabelTop:    '⏸ Bottom Pause',        // pause at lowest squat position
+    tempoLabelEcc:    '⬆ Concentric Ascent',  // driving back up to standing
   }
 };
 
@@ -1333,33 +1333,29 @@ function startRest() {
   document.getElementById('restSetInfo').textContent = `Rest before Set ${nextSet} of ${cfg.totalSets}`;
   document.getElementById('restNextLabel').textContent = `Set ${nextSet} — ${cfg.repsPerSet} reps`;
 
-  // Initialize from device's restSecsLeft if already available — prevents 1-2s desync
+  // Initialize from device's restSecsLeft if available
   const deviceSecs = sess.lastPacket?.restSecsLeft;
   sess.restRemaining = (deviceSecs && deviceSecs > 0) ? deviceSecs : cfg.restSeconds;
   document.getElementById('restSeconds').textContent = sess.restRemaining;
   drawRestArc(sess.restRemaining / cfg.restSeconds);
   document.getElementById('rest-overlay').classList.add('show');
 
-  // Tick every 1s — BLE sync (syncRestCountdown) keeps us aligned to device
-  sess.restTimer = setInterval(() => {
-    sess.restRemaining--;
-    if (sess.restRemaining < 0) sess.restRemaining = 0;
-    document.getElementById('restSeconds').textContent = sess.restRemaining;
-    drawRestArc(sess.restRemaining / cfg.restSeconds);
-    if (sess.restRemaining <= 0) skipRest();
-  }, 1000);
+  // NO setInterval — BLE sync is the only timer source (device sends restSecsLeft every 100ms)
+  // This prevents the website counter fighting the device clock
 }
 
-// Called every BLE packet during rest — device clock is authoritative, always sync
+// Called every BLE packet during rest — device clock is the ONLY source of truth
 function syncRestCountdown(deviceSecsLeft) {
   if (!sess.inRest) return;
   sess.restRemaining = deviceSecsLeft;
   document.getElementById('restSeconds').textContent = sess.restRemaining;
   drawRestArc(sess.restRemaining / cfg.restSeconds);
+  // If device sends 0, rest is ending — close overlay
+  if (deviceSecsLeft <= 0) skipRest();
 }
 
 function skipRest() {
-  clearInterval(sess.restTimer);
+  clearInterval(sess.restTimer); // no-op now but kept for safety
   document.getElementById('rest-overlay').classList.remove('show');
   sess.lastSkipTime = Date.now();
   if (sess.currentSet < cfg.totalSets) sess.currentSet++;  // cap at totalSets
