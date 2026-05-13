@@ -1121,8 +1121,7 @@ function onBleData(e) {
   }
 
   // BLE → rest sync
-  if (p.isResting && p.restSecsLeft > 0) {
-    // Guard: don't re-trigger startRest within 3s of a skipRest (prevents double-count)
+  if (p.isResting && p.restSecsLeft >= 0) {
     const timeSinceSkip = sess.lastSkipTime ? Date.now() - sess.lastSkipTime : 9999;
     if (!sess.inRest && sess.currentSet < cfg.totalSets && timeSinceSkip > 3000) {
       startRest();
